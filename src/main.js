@@ -11,8 +11,9 @@ import {
   EXTENSION_KEY_MAP, 
   TYPE_KEY_MAP, 
   VOICING_KEY_MAP,
-  MIDI_OCTAVE_START,
-  MIDI_OCTAVE_END,
+  MIDI_NOTE_MIN,
+  MIDI_NOTE_MAX,
+  MIDI_REFERENCE_OCTAVE,
   MIDI_EXTENSION_MAP
 } from './constants';
 
@@ -373,14 +374,15 @@ export class PoorchidApp {
   handleMidiNoteOn(note, vel) {
     if (!this.stateManager.get('powered')) return;
     
-    if (note < MIDI_OCTAVE_START) {
+    // Extension triggers (low notes below the keyboard range)
+    if (note < MIDI_NOTE_MIN) {
       const ext = MIDI_EXTENSION_MAP[note];
       if (ext) this.stateManager.setExtension(ext, true);
       return;
     }
     
-    // Single octave keyboard: only respond to notes within range
-    if (note > MIDI_OCTAVE_END) return;
+    // Full keyboard range
+    if (note > MIDI_NOTE_MAX) return;
     
     const noteName = this.logic.getNoteName(note);
     if (!noteName) return;
@@ -388,6 +390,15 @@ export class PoorchidApp {
     this.stateManager.state.activeMidiNotes.add(note);
     const rootChanged = this.stateManager.get('root') !== noteName;
     this.stateManager.setRoot(noteName);
+    
+    // Adjust voicing center based on which octave was played
+    // Playing higher shifts voicing up, playing lower shifts down
+    const octaveOffset = note - MIDI_REFERENCE_OCTAVE;
+    const currentVoicing = this.stateManager.get('voicingCenter');
+    const targetVoicing = 60 + octaveOffset; // Center around the played octave
+    // Smooth blend: move voicing towards the played octave
+    const newVoicing = Math.max(36, Math.min(84, Math.round(currentVoicing * 0.3 + targetVoicing * 0.7)));
+    this.stateManager.setVoicingCenter(newVoicing);
     
     // If root didn't change, we still need to trigger playback
     if (!rootChanged) {
@@ -400,14 +411,14 @@ export class PoorchidApp {
   handleMidiNoteOff(note) {
     if (!this.stateManager.get('powered')) return;
     
-    if (note < MIDI_OCTAVE_START) {
+    if (note < MIDI_NOTE_MIN) {
       const ext = MIDI_EXTENSION_MAP[note];
       if (ext) this.stateManager.setExtension(ext, false);
       return;
     }
     
-    // Single octave keyboard: only respond to notes within range
-    if (note > MIDI_OCTAVE_END) return;
+    // Full keyboard range
+    if (note > MIDI_NOTE_MAX) return;
     
     const noteName = this.logic.getNoteName(note);
     if (noteName) {

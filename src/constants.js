@@ -8,16 +8,18 @@ export const KEY_MAP = {
   ']': 'B'
 };
 
-// MIDI note ranges for single octave keyboard
-export const MIDI_OCTAVE_START = 60; // C4
-export const MIDI_OCTAVE_END = 71;   // B4
+// MIDI note ranges
+export const MIDI_NOTE_MIN = 21;  // A0 (lowest piano key)
+export const MIDI_NOTE_MAX = 108; // C8 (highest piano key)
+export const MIDI_REFERENCE_OCTAVE = 60; // C4 - reference point for voicing offset
 
-// MIDI notes that trigger chord extensions (one octave below)
+// MIDI notes that trigger chord extensions (mapped to low octave C0-F0)
+// These are checked BEFORE the main keyboard range
 export const MIDI_EXTENSION_MAP = {
-  48: '6',
-  50: '7',
-  52: 'maj7',
-  53: '9'
+  12: '6',    // C0
+  14: '7',    // D0
+  16: 'maj7', // E0
+  17: '9'     // F0
 };
 
 export const EXTENSION_KEY_MAP = {
@@ -35,6 +37,6 @@ export const TYPE_KEY_MAP = {
 };
 
 export const VOICING_KEY_MAP = {
-  'z': -12, // Down octave
-  'x': 12   // Up octave
+  'ArrowUp': 1,
+  'ArrowDown': -1
 };

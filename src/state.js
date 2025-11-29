@@ -157,7 +157,12 @@ export class PoorchidState {
   }
 
   toggleBass() {
-    this.setBassEnabled(!this.state.bassEnabled);
+    const wasEnabled = this.state.bassEnabled;
+    this.setBassEnabled(!wasEnabled);
+    // When first enabling bass, set volume to 10 (10% of 0-99 range)
+    if (!wasEnabled && this.state.bassEnabled) {
+      this.setBassVolume(10);
+    }
   }
 
   setLooperState(state) {

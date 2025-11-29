@@ -99,16 +99,20 @@ describe('MIDI Integration', () => {
   });
   
   it('should handle Keyboard Split (Extensions vs Root)', () => {
-    // Note < 60 (e.g. 48 - C3) -> Extension '6'
-    app.midi.triggerNoteOn(48, 100);
+    // Low notes (C0=12) trigger extensions
+    app.midi.triggerNoteOn(12, 100);
     expect(app.state.extensions.has('6')).toBe(true);
     
     // Release Extension
-    app.midi.triggerNoteOff(48);
+    app.midi.triggerNoteOff(12);
     expect(app.state.extensions.has('6')).toBe(false);
     
-    // Note >= 60 (e.g. 62 - D) -> Root
-    app.midi.triggerNoteOn(62, 100);
+    // Full keyboard range works for root notes (any octave)
+    app.midi.triggerNoteOn(62, 100); // D4
+    expect(app.state.root).toBe('D');
+    
+    app.midi.triggerNoteOff(62);
+    app.midi.triggerNoteOn(38, 100); // D2
     expect(app.state.root).toBe('D');
   });
 });
