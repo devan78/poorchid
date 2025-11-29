@@ -1,3 +1,5 @@
+import { DEFAULT_PATCH, getAdjacentPatch, PATCH_ORDER } from './patch-manager.js';
+
 export class PoorchidState {
   constructor(initialState = {}) {
     this.state = {
@@ -11,9 +13,11 @@ export class PoorchidState {
       activeMidiNotes: new Set(),
       looperState: 'idle', // idle, recording, playing, overdubbing
       isPlaying: false,
+      bassEnabled: false, // Bass on/off toggle (click Bass dial)
       bassMode: 'chords', // chords, unison, single, solo
-      bassVoicing: 0, // Semitone offset
-      bassVolume: 60,
+      bassVoicing: 0, // Octave offset: -2 to +2 (semitones -24 to +24)
+      bassVolume: 60, // 0-99 independent volume
+      currentPatch: DEFAULT_PATCH, // Current sound patch
       ...initialState
     };
     
@@ -99,24 +103,40 @@ export class PoorchidState {
   }
 
   setBassVoicing(val) {
-    if (this.state.bassVoicing !== val) {
-      this.state.bassVoicing = val;
+    // Clamp to valid range (-24 to +24 semitones, representing octave shifts)
+    const clamped = Math.max(-24, Math.min(24, val));
+    if (this.state.bassVoicing !== clamped) {
+      this.state.bassVoicing = clamped;
       this.notify(['bassVoicing']);
     }
   }
 
   setBassVolume(val) {
-    if (this.state.bassVolume !== val) {
-      this.state.bassVolume = val;
+    // Clamp to 0-99 range per Orchid spec
+    const clamped = Math.max(0, Math.min(99, val));
+    if (this.state.bassVolume !== clamped) {
+      this.state.bassVolume = clamped;
       this.notify(['bassVolume']);
     }
   }
 
   setBassMode(mode) {
-    if (this.state.bassMode !== mode) {
+    const validModes = ['chords', 'unison', 'single', 'solo'];
+    if (validModes.includes(mode) && this.state.bassMode !== mode) {
       this.state.bassMode = mode;
       this.notify(['bassMode']);
     }
+  }
+
+  setBassEnabled(enabled) {
+    if (this.state.bassEnabled !== enabled) {
+      this.state.bassEnabled = enabled;
+      this.notify(['bassEnabled']);
+    }
+  }
+
+  toggleBass() {
+    this.setBassEnabled(!this.state.bassEnabled);
   }
 
   setLooperState(state) {
@@ -145,5 +165,18 @@ export class PoorchidState {
     const currentIndex = modes.indexOf(this.state.bassMode);
     const nextIndex = (currentIndex + 1) % modes.length;
     this.setBassMode(modes[nextIndex]);
+  }
+
+  setPatch(patchId) {
+    if (this.state.currentPatch !== patchId) {
+      this.state.currentPatch = patchId;
+      this.notify(['currentPatch']);
+    }
+  }
+
+  cyclePatch(direction = 1) {
+    const nextPatch = getAdjacentPatch(this.state.currentPatch, direction);
+    this.setPatch(nextPatch);
+    return nextPatch;
   }
 }

@@ -53,7 +53,9 @@ export class PoorchidApp {
       setFilter: (val) => this.stateManager.setFilterCutoff(val),
       setBassVoicing: (val) => this.stateManager.setBassVoicing(val),
       setBassVolume: (val) => this.stateManager.setBassVolume(val),
+      toggleBass: () => this.stateManager.toggleBass(),
       cycleBassMode: () => this.stateManager.cycleBassMode(),
+      cyclePatch: (direction) => this.stateManager.cyclePatch(direction),
       toggleLoopRecord: () => this.toggleLoopRecord(),
       toggleLoopPlay: () => this.toggleLoopPlay(),
       undoLoop: () => {
@@ -113,6 +115,9 @@ export class PoorchidApp {
     if (changedProps.includes('bassVolume')) {
       this.audio.setBassVolume(state.bassVolume);
     }
+    if (changedProps.includes('currentPatch')) {
+      this.audio.setPatch(state.currentPatch);
+    }
 
     // Power Handling
     if (changedProps.includes('powered')) {
@@ -124,8 +129,13 @@ export class PoorchidApp {
       }
     }
 
+    // Bass toggle: stop bass if disabled
+    if (changedProps.includes('bassEnabled') && !state.bassEnabled) {
+      this.audio.stopBass();
+    }
+
     // Musical Updates (Re-trigger if playing)
-    const retriggerProps = ['type', 'extensions', 'voicingCenter', 'bassMode', 'bassVoicing'];
+    const retriggerProps = ['type', 'extensions', 'voicingCenter', 'bassMode', 'bassVoicing', 'bassEnabled'];
     
     if (state.powered) {
       if (changedProps.includes('root')) {
@@ -149,17 +159,50 @@ export class PoorchidApp {
     // 2. Apply voicing
     const voicedNotes = this.voicing.getVoicing(baseNotes, state.voicingCenter);
 
-    // 3. Bass Logic
+    // 3. Calculate bass note (root - 2 octaves + voicing offset)
     const rootMidi = this.logic.getMidiRoot(state.root);
     const bassNote = rootMidi - 24 + state.bassVoicing;
 
-    // 4. Play
-    if (state.bassMode === 'solo') {
-      this.audio.playChord([]); // Stop chords
-      this.audio.playBass(bassNote);
-    } else {
+    // 4. Play based on bass mode
+    if (!state.bassEnabled) {
+      // Bass off: just play chords normally
       this.audio.playChord(voicedNotes);
-      this.audio.playBass(bassNote);
+      this.audio.stopBass();
+    } else {
+      // Bass enabled: behavior depends on mode
+      switch (state.bassMode) {
+        case 'solo':
+          // Solo: Bass plays independently, no chords
+          this.audio.playChord([]);
+          this.audio.playBass(bassNote);
+          break;
+          
+        case 'unison':
+          // Unison: Bass matches the lowest note of the chord
+          this.audio.playChord(voicedNotes);
+          if (voicedNotes.length > 0) {
+            const lowestNote = Math.min(...voicedNotes);
+            this.audio.playBass(lowestNote - 12 + state.bassVoicing);
+          }
+          break;
+          
+        case 'single':
+          // Single Notes: One bass note (root) per chord
+          this.audio.playChord(voicedNotes);
+          this.audio.playBass(bassNote);
+          break;
+          
+        case 'chords':
+        default:
+          // Chords Only: Bass plays only when chords play (root note)
+          this.audio.playChord(voicedNotes);
+          if (voicedNotes.length > 0) {
+            this.audio.playBass(bassNote);
+          } else {
+            this.audio.stopBass();
+          }
+          break;
+      }
     }
 
     this.stateManager.setIsPlaying(true);

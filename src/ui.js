@@ -1,7 +1,10 @@
+import { PATCHES } from './patch-manager.js';
+
 export class PoorchidUI {
   constructor(container, actions) {
     this.container = container;
     this.actions = actions;
+    this.encoderRotations = {}; // Track rotation angles per encoder
     this.attachEvents();
   }
 
@@ -42,12 +45,14 @@ export class PoorchidUI {
           <div class="oled-screen">
             <div class="oled-header">POORCHID</div>
             <div class="oled-content">
+              <div class="oled-patch-name">${this.getPatchDisplayName(state.currentPatch)}</div>
               <div class="oled-main-text">${state.root} ${state.type}</div>
               <div class="oled-sub-text">${state.extensions.size > 0 ? Array.from(state.extensions).join(' ') : 'No extensions'}</div>
             </div>
             <div class="oled-status">
               <span class="status-item ${state.powered ? 'active' : ''}">PWR</span>
               <span class="status-item ${state.midiConnected ? 'active' : ''}">MIDI</span>
+              <span class="status-item ${state.bassEnabled ? 'active' : ''}">BASS</span>
               <span class="status-item ${state.looperState !== 'stopped' ? 'active' : ''}">LOOP</span>
             </div>
           </div>
@@ -55,11 +60,12 @@ export class PoorchidUI {
 
         <!-- Right Encoders -->
         <div class="encoder-group right-encoders">
-          <div class="encoder red" data-encoder="bass">
+          <div class="encoder red ${state.bassEnabled ? 'active' : ''}" data-encoder="bass" title="Click to toggle bass, hold for mode">
             <div class="encoder-knob">
               <div class="encoder-indicator"></div>
             </div>
             <span class="encoder-label">Bass</span>
+            <span class="encoder-mode">${state.bassMode.toUpperCase()}</span>
           </div>
           <div class="encoder charcoal" data-encoder="loop">
             <div class="encoder-knob">
@@ -158,8 +164,18 @@ export class PoorchidUI {
     this.renderKeyboard(state.root);
   }
 
+  getPatchDisplayName(patchId) {
+    const patch = PATCHES[patchId];
+    return patch ? patch.name : patchId;
+  }
+
   update(state) {
     // OLED Display updates
+    const oledPatch = this.container.querySelector('.oled-patch-name');
+    if (oledPatch) {
+      oledPatch.textContent = this.getPatchDisplayName(state.currentPatch);
+    }
+
     const oledMain = this.container.querySelector('.oled-main-text');
     if (oledMain) {
       oledMain.textContent = `${state.root} ${state.type}`;
@@ -181,9 +197,24 @@ export class PoorchidUI {
       midiStatus.classList.toggle('active', state.midiConnected);
     }
 
-    const loopStatus = this.container.querySelector('.status-item:nth-child(3)');
+    const bassStatus = this.container.querySelector('.status-item:nth-child(3)');
+    if (bassStatus) {
+      bassStatus.classList.toggle('active', state.bassEnabled);
+    }
+
+    const loopStatus = this.container.querySelector('.status-item:nth-child(4)');
     if (loopStatus) {
       loopStatus.classList.toggle('active', state.looperState !== 'stopped');
+    }
+
+    // Bass encoder visual state
+    const bassEncoder = this.container.querySelector('.encoder[data-encoder="bass"]');
+    if (bassEncoder) {
+      bassEncoder.classList.toggle('active', state.bassEnabled);
+      const modeLabel = bassEncoder.querySelector('.encoder-mode');
+      if (modeLabel) {
+        modeLabel.textContent = state.bassMode.toUpperCase();
+      }
     }
 
     // Hidden controls (for keyboard shortcuts to still work)
@@ -293,8 +324,44 @@ export class PoorchidUI {
   }
 
   attachEvents() {
+    // Track long-press for bass encoder
+    let bassLongPressTimer = null;
+    let bassWasLongPress = false;
+
+    this.container.addEventListener('mousedown', (e) => {
+      const bassEncoder = e.target.closest('.encoder[data-encoder="bass"]');
+      if (bassEncoder) {
+        bassWasLongPress = false;
+        bassLongPressTimer = setTimeout(() => {
+          bassWasLongPress = true;
+          this.actions.cycleBassMode();
+        }, 500); // 500ms for long press
+      }
+    });
+
+    this.container.addEventListener('mouseup', (e) => {
+      if (bassLongPressTimer) {
+        clearTimeout(bassLongPressTimer);
+        bassLongPressTimer = null;
+      }
+    });
+
+    this.container.addEventListener('mouseleave', (e) => {
+      if (bassLongPressTimer) {
+        clearTimeout(bassLongPressTimer);
+        bassLongPressTimer = null;
+      }
+    });
+
     this.container.addEventListener('click', (e) => {
       const target = e.target;
+
+      // Bass encoder click (short press = toggle on/off)
+      const bassEncoder = e.target.closest('.encoder[data-encoder="bass"]');
+      if (bassEncoder && !bassWasLongPress) {
+        this.actions.toggleBass();
+        return;
+      }
 
       if (target.id === 'power-btn') this.actions.togglePower();
       
@@ -335,5 +402,33 @@ export class PoorchidUI {
       if (e.target.id === 'bass-voicing-dial') this.actions.setBassVoicing(parseInt(e.target.value));
       if (e.target.id === 'bass-vol-dial') this.actions.setBassVolume(parseInt(e.target.value));
     });
+
+    // Mousewheel on encoders - rotate visually and trigger actions
+    this.container.addEventListener('wheel', (e) => {
+      const encoder = e.target.closest('.encoder[data-encoder]');
+      if (encoder) {
+        e.preventDefault();
+        const encoderName = encoder.dataset.encoder;
+        const direction = e.deltaY > 0 ? 1 : -1;
+        
+        // Update rotation angle (15 degrees per step)
+        if (!this.encoderRotations[encoderName]) {
+          this.encoderRotations[encoderName] = 0;
+        }
+        this.encoderRotations[encoderName] += direction * 15;
+        
+        // Apply rotation to the knob
+        const knob = encoder.querySelector('.encoder-knob');
+        if (knob) {
+          knob.style.transform = `rotate(${this.encoderRotations[encoderName]}deg)`;
+        }
+        
+        // Trigger specific actions based on encoder
+        if (encoderName === 'sound') {
+          this.actions.cyclePatch(direction);
+        }
+        // Future: add actions for other encoders (perform, fx, edit, tempo)
+      }
+    }, { passive: false });
   }
 }

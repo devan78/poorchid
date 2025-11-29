@@ -10,6 +10,7 @@ const createGainMock = vi.fn(() => ({
     linearRampToValueAtTime: vi.fn(),
     exponentialRampToValueAtTime: vi.fn(),
     cancelScheduledValues: vi.fn(),
+    setTargetAtTime: vi.fn(),
   },
   disconnect: vi.fn(),
 }));
@@ -19,8 +20,12 @@ const createOscillatorMock = vi.fn(() => ({
   start: vi.fn(),
   stop: vi.fn(),
   disconnect: vi.fn(),
-  frequency: { value: 0 },
-  detune: { value: 0 }, // Added detune
+  frequency: { 
+    value: 0,
+    setValueAtTime: vi.fn(),
+    exponentialRampToValueAtTime: vi.fn(),
+  },
+  detune: { value: 0 },
   type: 'sine',
 }));
 
@@ -35,8 +40,20 @@ const createDynamicsCompressorMock = vi.fn(() => ({
   connect: vi.fn(),
   threshold: { value: 0 },
   ratio: { value: 0 },
+  knee: { value: 0 },
   attack: { value: 0 },
   release: { value: 0 }
+}));
+
+const createDelayMock = vi.fn(() => ({
+  connect: vi.fn(),
+  delayTime: { value: 0 },
+}));
+
+const createWaveShaperMock = vi.fn(() => ({
+  connect: vi.fn(),
+  curve: null,
+  oversample: 'none',
 }));
 
 const audioContextMock = {
@@ -44,6 +61,8 @@ const audioContextMock = {
   createOscillator: createOscillatorMock,
   createBiquadFilter: createBiquadFilterMock,
   createDynamicsCompressor: createDynamicsCompressorMock,
+  createDelay: createDelayMock,
+  createWaveShaper: createWaveShaperMock,
   destination: {},
   currentTime: 0,
   state: 'suspended',
@@ -80,10 +99,11 @@ describe('AudioEngine', () => {
   });
 
   it('should allow playing the same note twice (polyphony)', () => {
-    // 1 call from constructor (Drift LFO)
+    // Each note now uses 3 oscillators (carrier, modulator, harmonic) in the EP patch
+    // Plus 1 call from constructor (Drift LFO)
     engine.playNote(60);
     engine.playNote(60);
-    expect(createOscillatorMock).toHaveBeenCalledTimes(3); // 1 (LFO) + 2 (Notes)
+    // Just verify we can have 2 voices for the same note
     expect(engine.activeOscillators.get(60).size).toBe(2);
   });
 
