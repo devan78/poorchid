@@ -1,0 +1,1183 @@
+:root {
+  /* Orchid-Inspired Premium Palette */
+  --chassis-bg: #e8e4d9;      /* Warm cream chassis */
+  --chassis-dark: #d5d0c3;    /* Chassis shadow */
+  --panel-bg: #1a1a1a;        /* Deep black control surface */
+  --panel-inset: #141414;     /* Recessed panel */
+  --text-label: #777;         /* Subdued label text */
+  --text-main: #ccc;          /* Main text */
+  
+  /* Accents - True to Orchid */
+  --accent-orange: #d35400;   /* Burnt orange */
+  --accent-yellow: #e6a817;   /* Warm mustard */
+  --accent-teal: #1a9178;     /* Vintage teal */
+  --accent-red: #b83227;      /* Deep red LED */
+  
+  /* Materials */
+  --wood-dark: #3e2723;       /* Dark walnut */
+  --wood-mid: #5d4037;        /* Walnut midtone */
+  --wood-light: #6d4c41;      /* Walnut highlight */
+  
+  --knob-silver: #a8a8a8;     /* Brushed aluminum */
+  --knob-highlight: #d0d0d0;  /* Knob shine */
+  --fader-cap: #2a2a2a;       /* Fader handle */
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+  background: linear-gradient(to bottom, #0a0a0a, #151515);
+  color: var(--text-main);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  padding: 2rem;
+}
+
+#app {
+  width: 100%;
+  max-width: 900px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+/* Header - Minimal, Premium */
+header {
+  text-align: center;
+  margin-bottom: 0.5rem;
+}
+
+h1 {
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  font-weight: 300;
+  font-size: 2rem;
+  letter-spacing: 0.3em;
+  color: #999;
+  text-transform: uppercase;
+  margin: 0;
+}
+
+header p {
+  font-size: 0.7rem;
+  color: #555;
+  margin: 0.3rem 0 0 0;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+/* Main Synth Chassis */
+#synth-interface {
+  background: linear-gradient(to bottom, var(--chassis-bg), var(--chassis-dark));
+  border-radius: 8px;
+  padding: 20px 40px;
+  box-shadow: 
+    0 40px 80px rgba(0,0,0,0.7),
+    0 15px 30px rgba(0,0,0,0.5),
+    inset 0 1px 0 rgba(255,255,255,0.8),
+    inset 0 -1px 0 rgba(0,0,0,0.1);
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  width: 100%;
+  position: relative;
+}
+
+/* Wood End Cheeks */
+#synth-interface::before,
+#synth-interface::after {
+  content: '';
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  width: 28px;
+  background: linear-gradient(90deg, 
+    var(--wood-dark) 0%, 
+    var(--wood-mid) 30%, 
+    var(--wood-light) 50%,
+    var(--wood-mid) 70%,
+    var(--wood-dark) 100%);
+  border-radius: 4px;
+  box-shadow: 
+    inset 0 0 10px rgba(0,0,0,0.5),
+    2px 0 8px rgba(0,0,0,0.3);
+}
+
+#synth-interface::before { 
+  left: -18px; 
+  border-radius: 4px 0 0 4px;
+}
+#synth-interface::after { 
+  right: -18px; 
+  border-radius: 0 4px 4px 0;
+}
+
+/* ROW 1: Configuration & Display Row */
+.config-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  background: var(--panel-bg);
+  padding: 16px 20px;
+  border-radius: 4px 4px 0 0;
+  box-shadow: 
+    inset 0 2px 8px rgba(0,0,0,0.9),
+    inset 0 0 0 1px rgba(0,0,0,0.5);
+  gap: 16px;
+}
+
+/* ROW 2: Performance Row */
+.performance-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: stretch;
+  width: 100%;
+  background: var(--panel-bg);
+  padding: 16px 20px;
+  border-radius: 0 0 4px 4px;
+  box-shadow: 
+    inset 0 -2px 8px rgba(0,0,0,0.6),
+    inset 0 0 0 1px rgba(0,0,0,0.5),
+    0 1px 0 rgba(255,255,255,0.3);
+  gap: 16px;
+  border-top: 1px solid #2a2a2a;
+}
+
+.performance-controls {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  gap: 20px;
+}
+
+.button-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  max-width: 280px;
+}
+
+.button-row {
+  display: flex;
+  gap: 8px;
+}
+
+/* Stacked Dials */
+.dial-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding-right: 8px;
+}
+
+.stacked-dial {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.dial-knob {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: linear-gradient(145deg, 
+    #4a4a4a 0%, 
+    #2a2a2a 50%, 
+    #1a1a1a 100%);
+  position: relative;
+  cursor: pointer;
+  box-shadow: 
+    0 4px 8px rgba(0,0,0,0.5),
+    0 2px 4px rgba(0,0,0,0.3),
+    inset 0 2px 4px rgba(255,255,255,0.1),
+    inset 0 -2px 4px rgba(0,0,0,0.3);
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+.dial-knob.small {
+  width: 40px;
+  height: 40px;
+}
+
+.dial-knob::before {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  right: 3px;
+  bottom: 3px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, 
+    rgba(255,255,255,0.1) 0%, 
+    transparent 50%,
+    rgba(0,0,0,0.2) 100%);
+}
+
+.dial-knob .dial-indicator {
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 3px;
+  height: 10px;
+  background: #fff;
+  border-radius: 2px;
+  box-shadow: 0 0 4px rgba(255,255,255,0.5);
+}
+
+.dial-knob.small .dial-indicator {
+  top: 5px;
+  width: 2px;
+  height: 7px;
+}
+
+.dial-knob:hover {
+  transform: scale(1.05);
+  box-shadow: 
+    0 6px 12px rgba(0,0,0,0.6),
+    0 3px 6px rgba(0,0,0,0.4),
+    inset 0 2px 4px rgba(255,255,255,0.15),
+    inset 0 -2px 4px rgba(0,0,0,0.3);
+}
+
+.dial-knob:active {
+  transform: scale(0.98);
+}
+
+.dial-label {
+  font-size: 0.5rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-label);
+}
+
+.perf-btn {
+  flex: 1;
+  aspect-ratio: 1;
+  padding: 8px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #777;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.08s ease-out;
+  position: relative;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Shiny type buttons (upper row) */
+.perf-btn[data-type] {
+  background: 
+    linear-gradient(160deg, rgba(255,255,255,0.25) 0%, rgba(255,255,255,0.08) 30%, transparent 50%),
+    radial-gradient(ellipse 80% 50% at 50% 20%, rgba(80,80,80,0.5) 0%, transparent 50%),
+    linear-gradient(to bottom, #3a3a3a 0%, #2a2a2a 50%, #252525 100%);
+  box-shadow: 
+    0 3px 0 #1a1a1a,
+    0 4px 8px rgba(0,0,0,0.5),
+    inset 0 1px 0 rgba(255,255,255,0.2),
+    inset 0 0 0 1px rgba(255,255,255,0.08),
+    inset 0 -8px 16px rgba(0,0,0,0.3);
+}
+
+/* Matte extension buttons (lower row) */
+.perf-btn[data-ext] {
+  background: #2a2a2a;
+  box-shadow: 
+    0 3px 0 #1a1a1a,
+    0 4px 8px rgba(0,0,0,0.5),
+    inset 0 0 0 1px rgba(0,0,0,0.3),
+    inset 0 -6px 12px rgba(0,0,0,0.4),
+    inset 0 4px 8px rgba(0,0,0,0.2);
+}
+
+.perf-btn::before {
+  content: '';
+  position: absolute;
+  top: 15%;
+  left: 15%;
+  right: 15%;
+  bottom: 15%;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at 50% 40%, 
+    rgba(0,0,0,0.3) 0%, 
+    rgba(0,0,0,0.15) 50%,
+    transparent 70%);
+  pointer-events: none;
+}
+
+.perf-btn[data-type]:hover {
+  background: 
+    linear-gradient(160deg, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0.1) 30%, transparent 50%),
+    radial-gradient(ellipse 80% 50% at 50% 20%, rgba(100,100,100,0.5) 0%, transparent 50%),
+    linear-gradient(to bottom, #454545 0%, #353535 50%, #2a2a2a 100%);
+  color: #999;
+}
+
+.perf-btn[data-ext]:hover {
+  background: #333;
+  color: #999;
+}
+
+.perf-btn:active {
+  top: 2px;
+  box-shadow: 
+    0 1px 0 #1a1a1a,
+    0 2px 4px rgba(0,0,0,0.3),
+    inset 0 0 0 1px rgba(255,255,255,0.05),
+    inset 0 -4px 12px rgba(0,0,0,0.5),
+    inset 0 4px 8px rgba(0,0,0,0.3);
+}
+
+/* Chord type buttons - teal when active */
+.perf-btn[data-type].active {
+  background: 
+    radial-gradient(ellipse 80% 50% at 50% 20%, rgba(40,180,150,0.3) 0%, transparent 50%),
+    radial-gradient(circle at 50% 50%, #0d6b5a 0%, var(--accent-teal) 40%, #1fa088 100%);
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+  box-shadow: 
+    0 1px 0 #0d5c4a,
+    0 2px 4px rgba(0,0,0,0.3),
+    inset 0 0 0 1px rgba(255,255,255,0.1),
+    inset 0 -8px 16px rgba(0,0,0,0.3),
+    inset 0 8px 12px rgba(0,80,60,0.2),
+    0 0 15px rgba(26, 145, 120, 0.4);
+  top: 2px;
+}
+
+.perf-btn[data-type].active::before {
+  background: radial-gradient(ellipse at 50% 40%, 
+    rgba(0,0,0,0.2) 0%, 
+    rgba(0,0,0,0.1) 50%,
+    transparent 70%);
+}
+
+/* Extension buttons - mustard when active */
+.perf-btn[data-ext].active {
+  background: 
+    radial-gradient(ellipse 80% 50% at 50% 20%, rgba(255,200,50,0.3) 0%, transparent 50%),
+    radial-gradient(circle at 50% 50%, #b8860b 0%, var(--accent-yellow) 40%, #edb515 100%);
+  color: #1a1a1a;
+  text-shadow: 0 1px 0 rgba(255,255,255,0.3);
+  box-shadow: 
+    0 1px 0 #9a7210,
+    0 2px 4px rgba(0,0,0,0.3),
+    inset 0 0 0 1px rgba(255,255,255,0.15),
+    inset 0 -8px 16px rgba(0,0,0,0.25),
+    inset 0 8px 12px rgba(180,130,0,0.2),
+    0 0 15px rgba(230, 168, 23, 0.3);
+  top: 2px;
+}
+
+.perf-btn[data-ext].active::before {
+  background: radial-gradient(ellipse at 50% 40%, 
+    rgba(0,0,0,0.15) 0%, 
+    rgba(0,0,0,0.08) 50%,
+    transparent 70%);
+}
+
+.placeholder-text {
+  color: #444;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+}
+
+.encoder-group {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.left-encoders {
+  flex: 0 0 auto;
+}
+
+.right-encoders {
+  flex: 0 0 auto;
+}
+
+/* Individual Encoder */
+.encoder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.encoder-knob {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  position: relative;
+  box-shadow: 
+    0 4px 8px rgba(0,0,0,0.5),
+    0 2px 4px rgba(0,0,0,0.3),
+    inset 0 2px 4px rgba(255,255,255,0.1),
+    inset 0 -2px 4px rgba(0,0,0,0.3);
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+.encoder-knob::before {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  right: 3px;
+  bottom: 3px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, 
+    rgba(255,255,255,0.15) 0%, 
+    transparent 50%,
+    rgba(0,0,0,0.2) 100%);
+}
+
+.encoder-indicator {
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 3px;
+  height: 10px;
+  background: #fff;
+  border-radius: 2px;
+  box-shadow: 0 0 4px rgba(255,255,255,0.5);
+}
+
+.encoder:hover .encoder-knob {
+  transform: scale(1.05);
+  box-shadow: 
+    0 6px 12px rgba(0,0,0,0.6),
+    0 3px 6px rgba(0,0,0,0.4),
+    inset 0 2px 4px rgba(255,255,255,0.15),
+    inset 0 -2px 4px rgba(0,0,0,0.3);
+}
+
+.encoder:active .encoder-knob {
+  transform: scale(0.98);
+}
+
+.encoder-label {
+  font-size: 0.55rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-label);
+}
+
+/* Encoder Colors */
+.encoder.yellow .encoder-knob {
+  background: linear-gradient(145deg, 
+    #f0c020 0%, 
+    var(--accent-yellow) 50%, 
+    #b8860b 100%);
+}
+
+.encoder.yellow .encoder-indicator {
+  background: #1a1a1a;
+  box-shadow: none;
+}
+
+.encoder.charcoal .encoder-knob {
+  background: linear-gradient(145deg, 
+    #4a4a4a 0%, 
+    #2a2a2a 50%, 
+    #1a1a1a 100%);
+}
+
+.encoder.red .encoder-knob {
+  background: linear-gradient(145deg, 
+    #e84433 0%, 
+    #c62828 50%, 
+    #8b1a1a 100%);
+}
+
+.encoder.red .encoder-indicator {
+  background: #fff;
+  box-shadow: 0 0 6px rgba(255,255,255,0.8);
+}
+
+/* OLED Display */
+.oled-display {
+  flex: 1;
+  max-width: 280px;
+  min-width: 200px;
+}
+
+.oled-screen {
+  background: #000;
+  border-radius: 4px;
+  padding: 10px 14px;
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', monospace;
+  box-shadow: 
+    inset 0 0 20px rgba(0,0,0,0.9),
+    inset 0 0 0 1px #1a1a1a,
+    0 1px 0 rgba(60,60,60,0.3);
+  position: relative;
+  overflow: hidden;
+}
+
+/* OLED scan line effect */
+.oled-screen::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent 0px,
+    transparent 2px,
+    rgba(0,0,0,0.15) 2px,
+    rgba(0,0,0,0.15) 4px
+  );
+  pointer-events: none;
+}
+
+/* OLED subtle glow */
+.oled-screen::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  right: -50%;
+  bottom: -50%;
+  background: radial-gradient(ellipse at center, 
+    rgba(0, 180, 220, 0.03) 0%, 
+    transparent 60%);
+  pointer-events: none;
+}
+
+.oled-header {
+  font-size: 0.5rem;
+  color: #00b4dc;
+  letter-spacing: 0.3em;
+  text-align: center;
+  margin-bottom: 6px;
+  text-shadow: 0 0 8px rgba(0, 180, 220, 0.6);
+  position: relative;
+  z-index: 1;
+}
+
+.oled-content {
+  text-align: center;
+  position: relative;
+  z-index: 1;
+}
+
+.oled-main-text {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #00e5ff;
+  text-transform: capitalize;
+  text-shadow: 
+    0 0 10px rgba(0, 229, 255, 0.8),
+    0 0 20px rgba(0, 229, 255, 0.4);
+  letter-spacing: 0.05em;
+}
+
+.oled-sub-text {
+  font-size: 0.65rem;
+  color: #00b4dc;
+  margin-top: 4px;
+  text-shadow: 0 0 6px rgba(0, 180, 220, 0.5);
+  letter-spacing: 0.1em;
+}
+
+.oled-status {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid #1a2a2a;
+  position: relative;
+  z-index: 1;
+}
+
+.status-item {
+  font-size: 0.5rem;
+  color: #333;
+  letter-spacing: 0.1em;
+  transition: color 0.2s, text-shadow 0.2s;
+}
+
+.status-item.active {
+  color: #00ff88;
+  text-shadow: 0 0 8px rgba(0, 255, 136, 0.8);
+}
+
+/* Legacy console panel (hidden but kept for compatibility) */
+.synth-console {
+  display: none;
+}
+
+.console-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 12px 16px;
+}
+
+.console-panel:not(:last-child) {
+  border-right: 1px solid #2a2a2a;
+}
+
+/* Section Headers - Minimal Labels */
+.panel-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.panel-section h3 {
+  font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+  font-size: 0.6rem;
+  font-weight: 500;
+  margin: 0;
+  color: var(--text-label);
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+}
+
+/* Button Grid */
+.btn-grid-2x2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.row-group {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+/* Buttons - Chunky Tactile Switches */
+button {
+  background: linear-gradient(to bottom, #3a3a3a 0%, #2a2a2a 100%);
+  color: #888;
+  border: none;
+  padding: 10px 8px;
+  font-family: inherit;
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.65rem;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  border-radius: 3px;
+  box-shadow: 
+    0 3px 0 #1a1a1a,
+    0 4px 8px rgba(0,0,0,0.4),
+    inset 0 1px 0 rgba(255,255,255,0.1);
+  transition: all 0.08s ease-out;
+  position: relative;
+  top: 0;
+}
+
+button:hover {
+  background: linear-gradient(to bottom, #404040 0%, #303030 100%);
+  color: #aaa;
+}
+
+button:active, button.active {
+  top: 2px;
+  box-shadow: 
+    0 1px 0 #1a1a1a,
+    0 2px 4px rgba(0,0,0,0.3),
+    inset 0 1px 3px rgba(0,0,0,0.4);
+}
+
+button.active {
+  color: #fff;
+}
+
+.key-hint {
+  display: block;
+  font-size: 0.55rem;
+  font-weight: 400;
+  opacity: 0.4;
+  margin-top: 3px;
+  letter-spacing: 0;
+}
+
+/* Chord Type Buttons - Teal Active */
+#type-controls button.active {
+  background: linear-gradient(to bottom, #1fa088 0%, var(--accent-teal) 100%);
+  box-shadow: 
+    0 1px 0 #0d5c4a,
+    0 2px 4px rgba(0,0,0,0.3),
+    inset 0 1px 0 rgba(255,255,255,0.2),
+    0 0 12px rgba(26, 145, 120, 0.4);
+}
+
+/* Extension Buttons - Mustard Active */
+#ext-controls button.active {
+  background: linear-gradient(to bottom, #edb515 0%, var(--accent-yellow) 100%);
+  color: #1a1a1a;
+  text-shadow: 0 1px 0 rgba(255,255,255,0.3);
+  box-shadow: 
+    0 1px 0 #9a7210,
+    0 2px 4px rgba(0,0,0,0.3),
+    inset 0 1px 0 rgba(255,255,255,0.3),
+    0 0 12px rgba(230, 168, 23, 0.3);
+}
+
+/* Power Button - Unobtrusive */
+#power-btn {
+  padding: 8px 10px;
+  font-size: 0.55rem;
+  letter-spacing: 0.05em;
+  opacity: 0.7;
+}
+
+#power-btn:hover {
+  opacity: 1;
+}
+
+#power-btn.active {
+  background: linear-gradient(to bottom, #d63a2a 0%, var(--accent-red) 100%);
+  box-shadow: 
+    0 1px 0 #6b1a12,
+    0 2px 4px rgba(0,0,0,0.3),
+    inset 0 1px 0 rgba(255,255,255,0.2),
+    0 0 15px rgba(184, 50, 39, 0.5);
+}
+
+/* MIDI Badge */
+.midi-badge {
+  background: #111;
+  color: #333;
+  padding: 6px 10px;
+  border-radius: 2px;
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  border: 1px solid #222;
+}
+
+.midi-badge.connected {
+  color: var(--accent-teal);
+  border-color: #1a4a40;
+  box-shadow: 0 0 8px rgba(26, 145, 120, 0.3);
+}
+
+/* Bass Mode Button */
+#bass-mode-btn {
+  font-size: 0.6rem;
+  padding: 8px 12px;
+}
+
+/* Faders/Sliders */
+.dials-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.dial-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.dial-wrapper label {
+  font-size: 0.55rem;
+  text-transform: uppercase;
+  color: var(--text-label);
+  letter-spacing: 0.1em;
+  font-weight: 500;
+}
+
+/* Range Slider - Fader Style */
+input[type=range] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  background: #0a0a0a;
+  border-radius: 2px;
+  outline: none;
+  border: 1px solid #333;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.8);
+}
+
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 22px;
+  background: linear-gradient(to bottom, 
+    var(--knob-highlight) 0%, 
+    var(--knob-silver) 30%, 
+    #888 100%);
+  cursor: pointer;
+  border-radius: 2px;
+  box-shadow: 
+    0 2px 4px rgba(0,0,0,0.5),
+    inset 0 1px 0 rgba(255,255,255,0.5),
+    inset 0 -1px 0 rgba(0,0,0,0.2);
+  border: 1px solid #666;
+}
+
+input[type=range]::-webkit-slider-thumb:hover {
+  background: linear-gradient(to bottom, 
+    #e0e0e0 0%, 
+    #c0c0c0 30%, 
+    #999 100%);
+}
+
+/* Looper Section */
+.looper-interface.compact {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.tape-reel.small svg {
+  width: 60px;
+  height: 60px;
+}
+
+.reel-track {
+  fill: none;
+  stroke: #0a0a0a;
+  stroke-width: 10;
+}
+
+.reel-progress {
+  fill: none;
+  stroke: var(--accent-orange);
+  stroke-width: 6;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  transform: rotate(-90deg);
+  transform-origin: 50% 50%;
+  transition: stroke-dashoffset 0.1s linear;
+  filter: drop-shadow(0 0 4px var(--accent-orange));
+}
+
+.btn-group.vertical {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+/* Looper Button States */
+#loop-rec-btn.active {
+  background: linear-gradient(to bottom, #d63a2a 0%, var(--accent-red) 100%);
+  animation: pulse-rec 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-rec {
+  0%, 100% { box-shadow: 0 1px 0 #6b1a12, 0 0 10px rgba(184, 50, 39, 0.4); }
+  50% { box-shadow: 0 1px 0 #6b1a12, 0 0 20px rgba(184, 50, 39, 0.7); }
+}
+
+#loop-play-btn.active {
+  background: linear-gradient(to bottom, #1fa088 0%, var(--accent-teal) 100%);
+}
+
+/* Keyboard Section - Right half of performance row */
+.keyboard {
+  flex: 1;
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  background: linear-gradient(180deg, #0a0a0a 0%, #151515 50%, #0d0d0d 100%);
+  padding: 12px;
+  border-radius: 4px;
+  position: relative;
+  box-shadow: 
+    inset 0 2px 6px rgba(0,0,0,0.8),
+    inset 0 0 0 1px rgba(40,40,40,0.5);
+  gap: 0;
+}
+
+/* No felt strip for compact keyboard */
+.keyboard::before {
+  display: none;
+}
+
+.key {
+  flex: 1;
+  min-width: 0;
+  height: 100px;
+  background: linear-gradient(175deg, 
+    #fefefe 0%, 
+    #f9f8f5 20%,
+    #f5f3ef 50%, 
+    #ebe8e2 85%,
+    #e0dcd5 100%);
+  border: none;
+  border-radius: 0 0 4px 4px;
+  margin: 0;
+  position: relative;
+  cursor: pointer;
+  box-shadow: 
+    -1px 0 0 #c5c0b8,
+    1px 0 0 #c5c0b8,
+    0 3px 0 #a8a49c,
+    0 4px 0 #8a8680,
+    0 5px 6px rgba(0,0,0,0.3),
+    inset 0 0 0 1px rgba(255,255,255,0.5),
+    inset 0 -6px 15px rgba(0,0,0,0.03);
+  transition: 
+    transform 0.06s cubic-bezier(0.2, 0, 0.4, 1),
+    box-shadow 0.06s cubic-bezier(0.2, 0, 0.4, 1),
+    background 0.06s ease;
+  z-index: 1;
+  flex-shrink: 0;
+}
+
+.key::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 60%;
+  background: linear-gradient(to bottom, 
+    rgba(255,255,255,0.4) 0%, 
+    rgba(255,255,255,0) 100%);
+  border-radius: 0 0 50% 50%;
+  pointer-events: none;
+}
+
+.key:hover {
+  background: linear-gradient(175deg, 
+    #ffffff 0%, 
+    #fcfbf9 20%,
+    #f8f7f3 50%, 
+    #f0ede7 85%,
+    #e5e2db 100%);
+}
+
+.key.black {
+  flex: 0.6;
+  height: 60px;
+  background: linear-gradient(175deg, 
+    #2d2d2d 0%, 
+    #1f1f1f 30%,
+    #151515 70%,
+    #0a0a0a 100%);
+  border: none;
+  margin-left: -0.3em;
+  margin-right: -0.3em;
+  z-index: 10;
+  border-radius: 0 0 3px 3px;
+  box-shadow: 
+    -1px 0 0 #3a3a3a,
+    1px 0 0 #3a3a3a,
+    0 2px 0 #0a0a0a,
+    0 3px 0 #000,
+    0 4px 6px rgba(0,0,0,0.5),
+    inset 0 0 0 1px rgba(60,60,60,0.3),
+    inset 0 -3px 6px rgba(0,0,0,0.4),
+    inset 0 15px 15px -8px rgba(80,80,80,0.2);
+}
+
+.key.black::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 2px;
+  right: 2px;
+  height: 40%;
+  background: linear-gradient(to bottom, 
+    rgba(100,100,100,0.3) 0%, 
+    rgba(50,50,50,0) 100%);
+  border-radius: 0 0 40% 40%;
+  pointer-events: none;
+}
+
+.key.black:hover {
+  background: linear-gradient(175deg, 
+    #383838 0%, 
+    #282828 30%,
+    #1a1a1a 70%,
+    #0f0f0f 100%);
+}
+
+/* Pressed States - Premium Feel */
+.key:active, .key.active, .key.pressed {
+  transform: translateY(3px);
+  background: linear-gradient(175deg, 
+    #f0ede8 0%, 
+    #e8e5df 30%,
+    #dfdbd4 60%, 
+    #d5d1c9 100%);
+  box-shadow: 
+    -1px 0 0 #b8b3ab,
+    1px 0 0 #b8b3ab,
+    0 1px 0 #a8a49c,
+    0 2px 0 #8a8680,
+    0 3px 6px rgba(0,0,0,0.3),
+    inset 0 0 0 1px rgba(255,255,255,0.3),
+    inset 0 2px 8px rgba(0,0,0,0.08);
+}
+
+.key.black:active, .key.black.active, .key.black.pressed {
+  transform: translateY(2px);
+  background: linear-gradient(175deg, 
+    #252525 0%, 
+    #1a1a1a 30%,
+    #101010 70%,
+    #080808 100%);
+  box-shadow: 
+    -1px 0 0 #2a2a2a,
+    1px 0 0 #2a2a2a,
+    0 1px 0 #0a0a0a,
+    0 2px 0 #000,
+    0 3px 5px rgba(0,0,0,0.4),
+    inset 0 0 0 1px rgba(50,50,50,0.2),
+    inset 0 3px 12px rgba(0,0,0,0.5);
+}
+
+.key-label {
+  display: none;
+}
+
+/* Loading State */
+.loading {
+  color: var(--accent-orange);
+  font-size: 1rem;
+  font-weight: 300;
+  letter-spacing: 0.2em;
+  animation: fade-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes fade-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+/* Responsive */
+@media (max-width: 900px) {
+  .config-row {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 12px;
+  }
+
+  .encoder-group {
+    gap: 10px;
+  }
+
+  .oled-display {
+    order: -1;
+    width: 100%;
+    max-width: 100%;
+    flex: 1 1 100%;
+  }
+
+  .left-encoders, .right-encoders {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+
+  .encoder-knob {
+    width: 38px;
+    height: 38px;
+  }
+
+  .encoder-indicator {
+    height: 8px;
+    top: 5px;
+  }
+
+  .performance-row {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .performance-controls,
+  .keyboard {
+    flex: none;
+    width: 100%;
+  }
+
+  .keyboard {
+    justify-content: center;
+  }
+
+  .key {
+    height: 80px;
+  }
+
+  .key.black {
+    height: 50px;
+  }
+}
+
+@media (max-width: 768px) {
+  #synth-interface {
+    padding: 16px 24px;
+  }
+  
+  #synth-interface::before,
+  #synth-interface::after {
+    width: 20px;
+  }
+  
+  #synth-interface::before { left: -12px; }
+  #synth-interface::after { right: -12px; }
+  
+  .config-row,
+  .performance-row {
+    padding: 12px 14px;
+  }
+
+  .encoder-group {
+    gap: 8px;
+  }
+
+  .encoder-knob {
+    width: 34px;
+    height: 34px;
+  }
+
+  .encoder-label {
+    font-size: 0.5rem;
+  }
+
+  .oled-screen {
+    padding: 8px 10px;
+  }
+
+  .oled-main-text {
+    font-size: 0.95rem;
+  }
+
+  .key {
+    height: 70px;
+  }
+  
+  .key.black {
+    height: 45px;
+  }
+}
