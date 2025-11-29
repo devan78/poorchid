@@ -3,6 +3,7 @@ import { ChordLogic } from './chord-logic';
 import { VoicingEngine } from './voicing-engine';
 import { MidiHandler } from './midi-handler';
 import { Looper } from './looper';
+import { Arpeggiator, Strummer } from './arpeggiator';
 import { PoorchidState } from './state';
 import { PoorchidUI } from './ui';
 import { 
@@ -36,6 +37,28 @@ export class PoorchidApp {
       onProgress: (progress) => this.updateLoopProgress(progress)
     });
 
+    // Initialize arpeggiator with dedicated monophonic voice
+    this.arpeggiator = new Arpeggiator(this.audio.ctx, {
+      onNoteOn: (note, vel) => this.audio.playArpNote(note, vel),
+      onNoteOff: (note) => {} // Arp voice handles its own note-off via legato
+    });
+    
+    // Strummer uses regular voices but tracks them
+    this.strumVoices = new Map();
+    this.strummer = new Strummer({
+      onNoteOn: (note, vel) => {
+        const voice = this.audio.playNote(note, vel / 127);
+        this.strumVoices.set(note, voice);
+      },
+      onNoteOff: (note) => {
+        const voice = this.strumVoices.get(note);
+        if (voice) {
+          this.audio.stopNote(voice);
+          this.strumVoices.delete(note);
+        }
+      }
+    });
+
     this.currentRecordedNotes = new Set();
 
     // Bound event handlers for cleanup
@@ -53,9 +76,22 @@ export class PoorchidApp {
       setFilter: (val) => this.stateManager.setFilterCutoff(val),
       setBassVoicing: (val) => this.stateManager.setBassVoicing(val),
       setBassVolume: (val) => this.stateManager.setBassVolume(val),
+      setVolume: (val) => this.stateManager.setVolume(val),
       toggleBass: () => this.stateManager.toggleBass(),
       cycleBassMode: () => this.stateManager.cycleBassMode(),
       cyclePatch: (direction) => this.stateManager.cyclePatch(direction),
+      toggleKey: () => this.stateManager.toggleKey(),
+      cycleKeyRoot: (direction) => this.stateManager.cycleKeyRoot(direction),
+      cycleKeyScale: () => this.stateManager.cycleKeyScale(),
+      // Performance mode actions
+      cyclePerformMode: () => this.stateManager.cyclePerformMode(),
+      cycleArpPattern: () => this.stateManager.cycleArpPattern(),
+      setPerformValue: (value) => this.setPerformValue(value),
+      // BPM actions
+      setBpm: (bpm) => this.stateManager.setBpm(bpm),
+      tapTempo: () => this.tapTempo(),
+      toggleMetronome: () => this.stateManager.toggleMetronome(),
+      // Looper actions
       toggleLoopRecord: () => this.toggleLoopRecord(),
       toggleLoopPlay: () => this.toggleLoopPlay(),
       undoLoop: () => {
@@ -74,6 +110,11 @@ export class PoorchidApp {
   async init() {
     // Initial Render
     this.ui.mount(this.stateManager.state);
+    
+    // Apply initial audio settings
+    this.audio.setVolume(this.stateManager.state.volume);
+    this.audio.setBassVolume(this.stateManager.state.bassVolume);
+    this.audio.setFilterCutoff(this.stateManager.state.filterCutoff);
     
     // Subscribe to State Changes
     this.stateManager.subscribe((state, changedProps) => {
@@ -115,8 +156,37 @@ export class PoorchidApp {
     if (changedProps.includes('bassVolume')) {
       this.audio.setBassVolume(state.bassVolume);
     }
+    if (changedProps.includes('volume')) {
+      this.audio.setVolume(state.volume);
+    }
     if (changedProps.includes('currentPatch')) {
       this.audio.setPatch(state.currentPatch);
+    }
+
+    // Arpeggiator parameter updates
+    if (changedProps.includes('bpm')) {
+      this.arpeggiator.setBpm(state.bpm);
+    }
+    if (changedProps.includes('arpPattern')) {
+      this.arpeggiator.setPattern(state.arpPattern);
+    }
+    if (changedProps.includes('arpDivision')) {
+      this.arpeggiator.setDivision(state.arpDivision);
+    }
+    if (changedProps.includes('strumSpeed')) {
+      this.strummer.setSpeed(state.strumSpeed);
+    }
+    
+    // Performance mode change
+    if (changedProps.includes('performMode')) {
+      // Stop arpeggiator when switching modes
+      if (state.performMode !== 'arp') {
+        this.arpeggiator.stop();
+      }
+      // Release strummer when switching modes
+      if (state.performMode !== 'strum') {
+        this.strummer.release();
+      }
     }
 
     // Power Handling
@@ -125,6 +195,8 @@ export class PoorchidApp {
         this.audio.resume();
       } else {
         this.audio.stopAll();
+        this.arpeggiator.stop();
+        this.strummer.release();
         this.stateManager.setIsPlaying(false);
       }
     }
@@ -163,7 +235,36 @@ export class PoorchidApp {
     const rootMidi = this.logic.getMidiRoot(state.root);
     const bassNote = rootMidi - 24 + state.bassVoicing;
 
-    // 4. Play based on bass mode
+    // 4. Handle performance mode
+    if (state.performMode === 'arp') {
+      // Arpeggiator mode: update notes and start if not running
+      this.arpeggiator.updateNotes(voicedNotes);
+      if (!this.arpeggiator.isRunning) {
+        this.arpeggiator.start(voicedNotes);
+      }
+      // Bass still plays normally in arp mode
+      if (state.bassEnabled) {
+        this.audio.playBass(bassNote);
+      }
+      this.stateManager.setIsPlaying(true);
+      return;
+    } else if (state.performMode === 'strum') {
+      // Strum mode: play chord with strum effect
+      this.strummer.release();
+      this.strummer.strum(voicedNotes);
+      if (state.bassEnabled) {
+        this.audio.playBass(bassNote);
+      }
+      this.stateManager.setIsPlaying(true);
+      return;
+    }
+    
+    // Direct mode: play immediately (stop arp if running)
+    if (this.arpeggiator.isRunning) {
+      this.arpeggiator.stop();
+    }
+
+    // 5. Play based on bass mode
     if (!state.bassEnabled) {
       // Bass off: just play chords normally
       this.audio.playChord(voicedNotes);
@@ -317,6 +418,8 @@ export class PoorchidApp {
     
     if (this.stateManager.state.activeMidiNotes.size === 0) {
       this.audio.stopAll();
+      this.arpeggiator.stop();
+      this.strummer.release();
       this.stateManager.setIsPlaying(false);
       
       if (this.currentRecordedNotes) {
@@ -402,6 +505,33 @@ export class PoorchidApp {
       const midiNote = this.logic.getMidiRoot(noteName);
       this.handleMidiNoteOff(midiNote);
     }
+  }
+
+  /**
+   * Set performance parameter value (0-99)
+   * - Arp mode: maps to note divisions (9 values)
+   * - Strum mode: direct strum speed
+   */
+  setPerformValue(value) {
+    const mode = this.stateManager.get('performMode');
+    
+    if (mode === 'arp') {
+      // Map 0-99 to 9 divisions: 1/1, 1/2, 1/4, 1/8, 1/16, 1/32, 1/4T, 1/8T, 1/16T
+      const divisions = ['1/1', '1/2', '1/4', '1/8', '1/16', '1/32', '1/4T', '1/8T', '1/16T'];
+      const index = Math.min(8, Math.floor(value / 11)); // 0-10=0, 11-21=1, etc.
+      this.stateManager.setArpDivision(divisions[index]);
+    } else if (mode === 'strum') {
+      this.stateManager.setStrumSpeed(value);
+      this.strummer.setSpeed(value);
+    }
+  }
+
+  /**
+   * Tap tempo - updates BPM based on tap intervals
+   */
+  tapTempo() {
+    const newBpm = this.arpeggiator.tapTempo();
+    this.stateManager.setBpm(newBpm);
   }
 }
 

@@ -11,7 +11,9 @@ vi.mock('../src/audio-engine', () => {
       playBass: vi.fn(),
       stopBass: vi.fn(),
       setBassVolume: vi.fn(),
-      setFilterCutoff: vi.fn()
+      setVolume: vi.fn(),
+      setFilterCutoff: vi.fn(),
+      setPatch: vi.fn()
     }))
   };
 });
@@ -29,29 +31,26 @@ describe('PoorchidApp Integration', () => {
   });
 
   it('should render UI', () => {
-    expect(container.querySelector('#power-btn')).toBeTruthy();
+    expect(container.querySelector('.encoder[data-encoder="volume"]')).toBeTruthy();
     expect(container.querySelector('.keyboard')).toBeTruthy();
   });
 
   it('should toggle power', () => {
-    const btn = container.querySelector('#power-btn');
-    // Starts powered on by default now
+    // Test power toggling through state directly (encoders handle power)
     expect(app.state.powered).toBe(true);
     
-    btn.click();
+    app.stateManager.setPower(false);
     expect(app.state.powered).toBe(false);
     expect(app.audio.stopAll).toHaveBeenCalled();
     
-    btn.click();
+    app.stateManager.setPower(true);
     expect(app.state.powered).toBe(true);
     expect(app.audio.resume).toHaveBeenCalled();
   });
 
   it('should change chord type', () => {
-    const minorBtn = container.querySelector('button[data-type="minor"]');
-    minorBtn.click();
+    app.stateManager.setChordType('minor');
     expect(app.state.type).toBe('minor');
-    expect(minorBtn.classList.contains('active')).toBe(true);
   });
 
   it('should change root note', () => {
@@ -62,19 +61,15 @@ describe('PoorchidApp Integration', () => {
   });
 
   it('should toggle extensions', () => {
-    const ext7 = container.querySelector('button[data-ext="7"]');
-    ext7.click();
+    app.stateManager.setExtension('7', true);
     expect(app.state.extensions.has('7')).toBe(true);
     
-    ext7.click();
+    app.stateManager.setExtension('7', false);
     expect(app.state.extensions.has('7')).toBe(false);
   });
 
   it('should update voicing', () => {
-    const dial = container.querySelector('#voicing-dial');
-    dial.value = 72;
-    dial.dispatchEvent(new Event('input', { bubbles: true }));
-    
+    app.stateManager.setVoicingCenter(72);
     expect(app.state.voicingCenter).toBe(72);
   });
 

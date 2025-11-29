@@ -28,6 +28,17 @@ export class ChordLogic {
     this.reverseNoteMap = [
       'C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'
     ];
+
+    // Scale intervals for key lock feature
+    this.scaleIntervals = {
+      'major': [0, 2, 4, 5, 7, 9, 11],      // W-W-H-W-W-W-H
+      'minor': [0, 2, 3, 5, 7, 8, 10],      // Natural minor
+      'dorian': [0, 2, 3, 5, 7, 9, 10],     // Minor with raised 6th
+      'phrygian': [0, 1, 3, 5, 7, 8, 10],   // Minor with lowered 2nd
+      'lydian': [0, 2, 4, 6, 7, 9, 11],     // Major with raised 4th
+      'mixolydian': [0, 2, 4, 5, 7, 9, 10], // Major with lowered 7th
+      'locrian': [0, 1, 3, 5, 6, 8, 10]     // Diminished scale
+    };
   }
 
   getMidiRoot(noteName) {
@@ -56,5 +67,76 @@ export class ChordLogic {
     });
 
     return notes.sort((a, b) => a - b);
+  }
+
+  /**
+   * Get the scale notes for a given key and scale type
+   * @param {string} keyRoot - The root note of the key (C, C#, D, etc.)
+   * @param {string} scaleType - The scale type (major, minor, dorian, etc.)
+   * @returns {number[]} Array of semitone offsets in the scale (0-11)
+   */
+  getScaleNotes(keyRoot, scaleType = 'major') {
+    const rootSemitone = this.noteMap[keyRoot] || 0;
+    const intervals = this.scaleIntervals[scaleType] || this.scaleIntervals['major'];
+    return intervals.map(interval => (rootSemitone + interval) % 12);
+  }
+
+  /**
+   * Quantize a note to the nearest note in the scale
+   * @param {number} midiNote - The MIDI note number to quantize
+   * @param {string} keyRoot - The root note of the key
+   * @param {string} scaleType - The scale type
+   * @returns {number} The quantized MIDI note number
+   */
+  quantizeToScale(midiNote, keyRoot, scaleType = 'major') {
+    const scaleNotes = this.getScaleNotes(keyRoot, scaleType);
+    const noteSemitone = midiNote % 12;
+    const octave = Math.floor(midiNote / 12);
+    
+    // Check if note is already in scale
+    if (scaleNotes.includes(noteSemitone)) {
+      return midiNote;
+    }
+    
+    // Find nearest scale note
+    let minDistance = 12;
+    let nearestSemitone = noteSemitone;
+    
+    for (const scaleSemitone of scaleNotes) {
+      // Calculate distance considering octave wrapping
+      const dist1 = Math.abs(noteSemitone - scaleSemitone);
+      const dist2 = 12 - dist1; // Wrap around distance
+      const distance = Math.min(dist1, dist2);
+      
+      if (distance < minDistance) {
+        minDistance = distance;
+        nearestSemitone = scaleSemitone;
+      }
+    }
+    
+    // Reconstruct the MIDI note
+    let result = octave * 12 + nearestSemitone;
+    
+    // Handle edge case where quantization crosses octave boundary
+    if (nearestSemitone > noteSemitone && nearestSemitone - noteSemitone > 6) {
+      result -= 12; // Go to lower octave
+    } else if (noteSemitone > nearestSemitone && noteSemitone - nearestSemitone > 6) {
+      result += 12; // Go to higher octave
+    }
+    
+    return result;
+  }
+
+  /**
+   * Quantize a chord root to the key, returning the nearest valid root
+   * @param {string} rootName - The original root note name
+   * @param {string} keyRoot - The key to quantize to
+   * @param {string} scaleType - The scale type
+   * @returns {string} The quantized root note name
+   */
+  quantizeRoot(rootName, keyRoot, scaleType = 'major') {
+    const midiNote = this.getMidiRoot(rootName);
+    const quantized = this.quantizeToScale(midiNote, keyRoot, scaleType);
+    return this.getNoteName(quantized);
   }
 }

@@ -509,6 +509,18 @@ header p {
     inset 0 1px 2px rgba(255,255,255,0.1);
 }
 
+/* Dragging state for encoders */
+.encoder.dragging .encoder-knob {
+  box-shadow: 
+    0 2px 4px rgba(0,0,0,0.5),
+    inset 0 1px 2px rgba(255,255,255,0.1),
+    0 0 8px rgba(0, 180, 220, 0.3);
+}
+
+.encoder.dragging {
+  cursor: ns-resize;
+}
+
 .encoder-label {
   font-size: 0.55rem;
   font-weight: 600;
@@ -529,10 +541,42 @@ header p {
   box-shadow: none;
 }
 
+/* Perform encoder active state (when not in direct mode) */
+.encoder.yellow.active .encoder-knob {
+  --knob-color: #e0b020;
+  --knob-highlight: #f0c030;
+  --knob-shadow: #b08010;
+  box-shadow:
+    0 0 12px rgba(255, 235, 59, 0.5),
+    inset 0 3px 6px var(--knob-highlight),
+    inset 0 -3px 6px var(--knob-shadow);
+}
+
+.encoder.yellow.active .encoder-indicator {
+  background: #ffeb3b;
+  box-shadow: 0 0 10px rgba(255, 235, 59, 0.9);
+}
+
 .encoder.charcoal .encoder-knob {
   --knob-color: #3a3a3a;
   --knob-highlight: #5a5a5a;
   --knob-shadow: #1a1a1a;
+}
+
+/* Key encoder active state (when key lock is enabled) */
+.encoder.charcoal.active .encoder-knob {
+  --knob-color: #0088aa;
+  --knob-highlight: #00b4dc;
+  --knob-shadow: #005577;
+  box-shadow:
+    0 0 12px rgba(0, 180, 220, 0.5),
+    inset 0 3px 6px var(--knob-highlight),
+    inset 0 -3px 6px var(--knob-shadow);
+}
+
+.encoder.charcoal.active .encoder-indicator {
+  background: #00e5ff;
+  box-shadow: 0 0 10px rgba(0, 229, 255, 0.9);
 }
 
 .encoder.red .encoder-knob {
@@ -632,11 +676,86 @@ header p {
   font-size: 0.5rem;
   color: #00b4dc;
   letter-spacing: 0.3em;
-  text-align: center;
   margin-bottom: 6px;
   text-shadow: 0 0 8px rgba(0, 180, 220, 0.6);
   position: relative;
   z-index: 1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.oled-volume {
+  font-size: 0.45rem;
+  color: #888;
+  letter-spacing: 0.1em;
+  text-shadow: none;
+  font-weight: 500;
+  transition: color 0.15s ease;
+}
+
+/* Highlight volume when recently changed */
+.oled-volume:hover {
+  color: #00b4dc;
+  text-shadow: 0 0 6px rgba(0, 180, 220, 0.5);
+}
+
+.oled-bass-mode {
+  font-size: 0.45rem;
+  color: #666;
+  letter-spacing: 0.1em;
+  text-shadow: none;
+  font-weight: 500;
+  transition: color 0.15s ease;
+}
+
+.oled-bass-mode.active {
+  color: #ff9800;
+  text-shadow: 0 0 6px rgba(255, 152, 0, 0.5);
+}
+
+.oled-key-mode {
+  font-size: 0.45rem;
+  color: #666;
+  letter-spacing: 0.1em;
+  text-shadow: none;
+  font-weight: 500;
+  transition: color 0.15s ease;
+}
+
+.oled-key-mode.active {
+  color: #00e5ff;
+  text-shadow: 0 0 6px rgba(0, 229, 255, 0.5);
+}
+
+.oled-perform-mode {
+  font-size: 0.45rem;
+  color: #666;
+  letter-spacing: 0.1em;
+  text-shadow: none;
+  font-weight: 500;
+  transition: color 0.15s ease;
+}
+
+.oled-perform-mode.active {
+  color: #ffeb3b;
+  text-shadow: 0 0 6px rgba(255, 235, 59, 0.5);
+}
+
+.oled-bpm {
+  font-size: 0.45rem;
+  color: #888;
+  letter-spacing: 0.1em;
+  text-shadow: none;
+  font-weight: 500;
+}
+
+.oled-info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 4px;
+  padding: 0 4px;
 }
 
 .oled-content {

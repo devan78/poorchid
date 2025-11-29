@@ -10,7 +10,9 @@ vi.mock('../src/audio-engine', () => ({
     playBass: vi.fn(),
     stopBass: vi.fn(),
     setBassVolume: vi.fn(),
-    setFilterCutoff: vi.fn()
+    setVolume: vi.fn(),
+    setFilterCutoff: vi.fn(),
+    setPatch: vi.fn()
   }))
 }));
 

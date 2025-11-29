@@ -3,7 +3,14 @@ import { PATCHES, DEFAULT_PATCH } from './patch-manager';
 
 export class AudioEngine {
   constructor() {
-    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+    try {
+      this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+    } catch (e) {
+      console.error('Web Audio API not supported:', e);
+      this.ctx = null;
+      return;
+    }
+    
     this.currentPatch = PATCHES[DEFAULT_PATCH];
     this.patchId = DEFAULT_PATCH;
     
@@ -152,7 +159,7 @@ export class AudioEngine {
 
   resume() {
     if (this.ctx.state === 'suspended') {
-      this.ctx.resume();;
+      this.ctx.resume();
     }
   }
 
@@ -363,6 +370,7 @@ export class AudioEngine {
 
   stopAll() {
     this.stopBass();
+    this.stopArpNote(); // Stop arp voice
     // Stop all active oscillators
     for (const voices of this.activeOscillators.values()) {
       for (const voice of voices) {
@@ -373,11 +381,104 @@ export class AudioEngine {
     this.activeOscillators.clear();
   }
 
+  // === ARPEGGIATOR VOICE (Monophonic, uses current patch) ===
+  playArpNote(midiNote, velocity = 80) {
+    const now = this.ctx.currentTime;
+    
+    // Stop previous arp note with quick release
+    if (this.arpVoice) {
+      if (this.arpVoice.patchVoice && this.arpVoice.patchVoice.release) {
+        this.arpVoice.patchVoice.release(0);
+      } else if (this.arpVoice.gain) {
+        this.arpVoice.gain.gain.cancelScheduledValues(now);
+        this.arpVoice.gain.gain.setValueAtTime(this.arpVoice.gain.gain.value, now);
+        this.arpVoice.gain.gain.linearRampToValueAtTime(0, now + 0.01);
+        if (this.arpVoice.osc) {
+          this.arpVoice.osc.stop(now + 0.02);
+        }
+      }
+      this.arpVoice = null;
+    }
+    
+    // Create new voice using current patch (same as playNote)
+    const freq = midiToFreq(midiNote);
+    const vel = velocity / 127;
+    
+    if (this.currentPatch && this.currentPatch.createVoice) {
+      const patchVoice = this.currentPatch.createVoice(this.ctx, freq, vel);
+      patchVoice.output.connect(this.voiceInput);
+      
+      this.arpVoice = {
+        patchVoice,
+        note: midiNote
+      };
+      return this.arpVoice;
+    }
+    
+    // Legacy fallback
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    
+    osc.type = 'sawtooth';
+    osc.frequency.value = freq;
+    this.driftGain.connect(osc.detune);
+    osc.detune.value = (Math.random() * 10) - 5;
+    
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(0.3 * vel, now + 0.015);
+    
+    osc.connect(gain);
+    gain.connect(this.voiceInput);
+    osc.start(now);
+    
+    this.arpVoice = { osc, gain, note: midiNote };
+    return this.arpVoice;
+  }
+  
+  stopArpNote() {
+    if (!this.arpVoice) return;
+    
+    const now = this.ctx.currentTime;
+    const voice = this.arpVoice;
+    
+    // Handle patch voices
+    if (voice.patchVoice && voice.patchVoice.release) {
+      voice.patchVoice.release(0);
+      this.arpVoice = null;
+      return;
+    }
+    
+    // Legacy voice cleanup
+    if (voice.gain) {
+      voice.gain.gain.cancelScheduledValues(now);
+      voice.gain.gain.setValueAtTime(voice.gain.gain.value, now);
+      voice.gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+    }
+    
+    if (voice.osc) {
+      voice.osc.stop(now + 0.1);
+      setTimeout(() => {
+        try {
+          voice.osc.disconnect();
+          if (voice.gain) voice.gain.disconnect();
+        } catch (e) {}
+      }, 150);
+    }
+    
+    this.arpVoice = null;
+  }
+
   setFilterCutoff(freq) {
     if (this.masterFilter) {
       // Clamp frequency to safe range
       const safeFreq = Math.max(20, Math.min(20000, freq));
       this.masterFilter.frequency.setTargetAtTime(safeFreq, this.ctx.currentTime, 0.1);
     }
+  }
+
+  setVolume(val) {
+    // Exponential curve for more natural volume control (0-99 range)
+    const gain = Math.pow(val / 99, 2);
+    this.masterGain.gain.setTargetAtTime(gain, this.ctx.currentTime, 0.02);
   }
 }

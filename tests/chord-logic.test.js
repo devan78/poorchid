@@ -78,4 +78,62 @@ describe('ChordLogic', () => {
       expect(notes.length).toBe(5);
     });
   });
+
+  describe('Key Quantization', () => {
+    it('should get scale notes for C major', () => {
+      const scaleNotes = logic.getScaleNotes('C', 'major');
+      // C major: C D E F G A B = 0 2 4 5 7 9 11
+      expect(scaleNotes).toEqual([0, 2, 4, 5, 7, 9, 11]);
+    });
+
+    it('should get scale notes for A minor', () => {
+      const scaleNotes = logic.getScaleNotes('A', 'minor');
+      // A minor: A B C D E F G = 9 11 0 2 4 5 7
+      expect(scaleNotes).toEqual([9, 11, 0, 2, 4, 5, 7]);
+    });
+
+    it('should not modify notes already in scale', () => {
+      // C (60) is in C major
+      expect(logic.quantizeToScale(60, 'C', 'major')).toBe(60);
+      // E (64) is in C major
+      expect(logic.quantizeToScale(64, 'C', 'major')).toBe(64);
+      // G (67) is in C major
+      expect(logic.quantizeToScale(67, 'C', 'major')).toBe(67);
+    });
+
+    it('should quantize C# to C or D in C major', () => {
+      // C# (61) should go to either C (60) or D (62)
+      const quantized = logic.quantizeToScale(61, 'C', 'major');
+      expect([60, 62]).toContain(quantized);
+    });
+
+    it('should quantize F# to F or G in C major', () => {
+      // F# (66) should go to F (65) or G (67)
+      const quantized = logic.quantizeToScale(66, 'C', 'major');
+      expect([65, 67]).toContain(quantized);
+    });
+
+    it('should quantize root names', () => {
+      // F# in C major should become F or G
+      const quantized = logic.quantizeRoot('F#', 'C', 'major');
+      expect(['F', 'G']).toContain(quantized);
+    });
+
+    it('should work with different keys', () => {
+      // In G major (G A B C D E F#), F should become F# or E
+      const scaleNotes = logic.getScaleNotes('G', 'major');
+      expect(scaleNotes).toContain(6); // F# = 6 semitones
+      expect(scaleNotes).not.toContain(5); // F is not in G major
+      
+      // F (65) in G major -> quantize to F# (66) or E (64)
+      const quantized = logic.quantizeToScale(65, 'G', 'major');
+      expect([64, 66]).toContain(quantized);
+    });
+
+    it('should work across octaves', () => {
+      // C# in octave 5 (73) should also be quantized
+      const quantized = logic.quantizeToScale(73, 'C', 'major');
+      expect([72, 74]).toContain(quantized); // C5 or D5
+    });
+  });
 });

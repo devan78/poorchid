@@ -14,7 +14,7 @@ export const TapeStrings = {
   
   createVoice(ctx, freq, velocity = 0.8) {
     const now = ctx.currentTime;
-    const velGain = 0.15 + (velocity * 0.2);
+    const velGain = 0.3 + (velocity * 0.4);
     
     // Three oscillators for thickness (like tape heads)
     const oscs = [];
@@ -23,7 +23,7 @@ export const TapeStrings = {
     const levels = [0.3, 0.3, 0.4];
     
     const mixer = ctx.createGain();
-    mixer.gain.value = 0.3;
+    mixer.gain.value = 0.5;
     
     types.forEach((type, i) => {
       const osc = ctx.createOscillator();

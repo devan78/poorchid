@@ -1,4 +1,4 @@
-import { DEFAULT_PATCH, getAdjacentPatch, PATCH_ORDER } from './patch-manager.js';
+import { DEFAULT_PATCH, getAdjacentPatch } from './patch-manager.js';
 
 export class PoorchidState {
   constructor(initialState = {}) {
@@ -17,7 +17,19 @@ export class PoorchidState {
       bassMode: 'chords', // chords, unison, single, solo
       bassVoicing: 0, // Octave offset: -2 to +2 (semitones -24 to +24)
       bassVolume: 60, // 0-99 independent volume
+      volume: 70, // Master volume 0-99
       currentPatch: DEFAULT_PATCH, // Current sound patch
+      keyEnabled: false, // Key lock mode on/off
+      keyRoot: 'C', // Current key root (C, C#, D, etc.)
+      keyScale: 'major', // Scale type (major, minor, dorian, etc.)
+      // Performance mode
+      performMode: 'direct', // direct, arp, strum, pattern
+      arpPattern: 'up', // up, down, updown, random
+      arpDivision: '1/8', // Note division
+      strumSpeed: 50, // 0-99
+      // BPM
+      bpm: 120, // 20-300
+      metronomeOn: false,
       ...initialState
     };
     
@@ -120,6 +132,15 @@ export class PoorchidState {
     }
   }
 
+  setVolume(val) {
+    // Master volume 0-99
+    const clamped = Math.max(0, Math.min(99, val));
+    if (this.state.volume !== clamped) {
+      this.state.volume = clamped;
+      this.notify(['volume']);
+    }
+  }
+
   setBassMode(mode) {
     const validModes = ['chords', 'unison', 'single', 'solo'];
     if (validModes.includes(mode) && this.state.bassMode !== mode) {
@@ -178,5 +199,122 @@ export class PoorchidState {
     const nextPatch = getAdjacentPatch(this.state.currentPatch, direction);
     this.setPatch(nextPatch);
     return nextPatch;
+  }
+
+  // Key mode methods
+  setKeyEnabled(enabled) {
+    if (this.state.keyEnabled !== enabled) {
+      this.state.keyEnabled = enabled;
+      this.notify(['keyEnabled']);
+    }
+  }
+
+  toggleKey() {
+    this.setKeyEnabled(!this.state.keyEnabled);
+  }
+
+  setKeyRoot(root) {
+    const validRoots = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    if (validRoots.includes(root) && this.state.keyRoot !== root) {
+      this.state.keyRoot = root;
+      this.notify(['keyRoot']);
+    }
+  }
+
+  cycleKeyRoot(direction = 1) {
+    const roots = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    const currentIndex = roots.indexOf(this.state.keyRoot);
+    const nextIndex = (currentIndex + direction + roots.length) % roots.length;
+    this.setKeyRoot(roots[nextIndex]);
+  }
+
+  setKeyScale(scale) {
+    const validScales = ['major', 'minor', 'dorian', 'phrygian', 'lydian', 'mixolydian', 'locrian'];
+    if (validScales.includes(scale) && this.state.keyScale !== scale) {
+      this.state.keyScale = scale;
+      this.notify(['keyScale']);
+    }
+  }
+
+  cycleKeyScale() {
+    const scales = ['major', 'minor', 'dorian', 'phrygian', 'lydian', 'mixolydian', 'locrian'];
+    const currentIndex = scales.indexOf(this.state.keyScale);
+    const nextIndex = (currentIndex + 1) % scales.length;
+    this.setKeyScale(scales[nextIndex]);
+  }
+
+  // Performance mode methods
+  setPerformMode(mode) {
+    const validModes = ['direct', 'arp', 'strum', 'pattern'];
+    if (validModes.includes(mode) && this.state.performMode !== mode) {
+      this.state.performMode = mode;
+      this.notify(['performMode']);
+    }
+  }
+
+  cyclePerformMode() {
+    const modes = ['direct', 'arp', 'strum', 'pattern'];
+    const currentIndex = modes.indexOf(this.state.performMode);
+    const nextIndex = (currentIndex + 1) % modes.length;
+    this.setPerformMode(modes[nextIndex]);
+    return this.state.performMode;
+  }
+
+  setArpPattern(pattern) {
+    const validPatterns = ['up', 'down', 'updown', 'random'];
+    if (validPatterns.includes(pattern) && this.state.arpPattern !== pattern) {
+      this.state.arpPattern = pattern;
+      this.notify(['arpPattern']);
+    }
+  }
+
+  cycleArpPattern() {
+    const patterns = ['up', 'down', 'updown', 'random'];
+    const currentIndex = patterns.indexOf(this.state.arpPattern);
+    const nextIndex = (currentIndex + 1) % patterns.length;
+    this.setArpPattern(patterns[nextIndex]);
+    return this.state.arpPattern;
+  }
+
+  setArpDivision(division) {
+    const validDivisions = ['1/1', '1/2', '1/4', '1/8', '1/16', '1/32', '1/4T', '1/8T', '1/16T'];
+    if (validDivisions.includes(division) && this.state.arpDivision !== division) {
+      this.state.arpDivision = division;
+      this.notify(['arpDivision']);
+    }
+  }
+
+  cycleArpDivision(direction = 1) {
+    const divisions = ['1/1', '1/2', '1/4', '1/8', '1/16', '1/32', '1/4T', '1/8T', '1/16T'];
+    const currentIndex = divisions.indexOf(this.state.arpDivision);
+    const nextIndex = (currentIndex + direction + divisions.length) % divisions.length;
+    this.setArpDivision(divisions[nextIndex]);
+    return this.state.arpDivision;
+  }
+
+  setStrumSpeed(speed) {
+    const clamped = Math.max(0, Math.min(99, speed));
+    if (this.state.strumSpeed !== clamped) {
+      this.state.strumSpeed = clamped;
+      this.notify(['strumSpeed']);
+    }
+  }
+
+  // BPM methods
+  setBpm(bpm) {
+    const clamped = Math.max(20, Math.min(300, bpm));
+    if (this.state.bpm !== clamped) {
+      this.state.bpm = clamped;
+      this.notify(['bpm']);
+    }
+  }
+
+  adjustBpm(delta) {
+    this.setBpm(this.state.bpm + delta);
+  }
+
+  toggleMetronome() {
+    this.state.metronomeOn = !this.state.metronomeOn;
+    this.notify(['metronomeOn']);
   }
 }

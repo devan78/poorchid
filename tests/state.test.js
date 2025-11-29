@@ -95,6 +95,30 @@ describe('PoorchidState', () => {
       expect(state.get('bassVolume')).toBe(50); // Within range
     });
 
+    it('should have default master volume of 70', () => {
+      expect(state.get('volume')).toBe(70);
+    });
+
+    it('should set and clamp master volume to 0-99 range', () => {
+      state.setVolume(-10);
+      expect(state.get('volume')).toBe(0); // Clamped to min
+      
+      state.setVolume(150);
+      expect(state.get('volume')).toBe(99); // Clamped to max
+      
+      state.setVolume(80);
+      expect(state.get('volume')).toBe(80); // Within range
+    });
+
+    it('should notify listeners on volume change', () => {
+      listener.mockClear();
+      state.setVolume(50);
+      expect(listener).toHaveBeenCalledWith(
+        expect.objectContaining({ volume: 50 }),
+        ['volume']
+      );
+    });
+
     it('should notify listeners on bass state changes', () => {
       listener.mockClear();
       
@@ -175,6 +199,103 @@ describe('PoorchidState', () => {
       
       state.toggleExtension('7');
       expect(state.get('extensions').has('7')).toBe(false);
+    });
+  });
+
+  describe('Key mode functionality', () => {
+    it('should have key mode disabled by default', () => {
+      expect(state.get('keyEnabled')).toBe(false);
+    });
+
+    it('should have default key as C major', () => {
+      expect(state.get('keyRoot')).toBe('C');
+      expect(state.get('keyScale')).toBe('major');
+    });
+
+    it('should toggle key mode', () => {
+      expect(state.get('keyEnabled')).toBe(false);
+      state.toggleKey();
+      expect(state.get('keyEnabled')).toBe(true);
+      expect(listener).toHaveBeenCalledWith(
+        expect.objectContaining({ keyEnabled: true }),
+        ['keyEnabled']
+      );
+      
+      state.toggleKey();
+      expect(state.get('keyEnabled')).toBe(false);
+    });
+
+    it('should cycle through key roots', () => {
+      expect(state.get('keyRoot')).toBe('C');
+      
+      state.cycleKeyRoot(1);
+      expect(state.get('keyRoot')).toBe('C#');
+      
+      state.cycleKeyRoot(1);
+      expect(state.get('keyRoot')).toBe('D');
+      
+      // Cycle backwards
+      state.cycleKeyRoot(-1);
+      expect(state.get('keyRoot')).toBe('C#');
+    });
+
+    it('should wrap around when cycling key roots', () => {
+      state.setKeyRoot('B');
+      state.cycleKeyRoot(1);
+      expect(state.get('keyRoot')).toBe('C'); // Wraps around
+      
+      state.cycleKeyRoot(-1);
+      expect(state.get('keyRoot')).toBe('B'); // Wraps back
+    });
+
+    it('should cycle through scale types', () => {
+      expect(state.get('keyScale')).toBe('major');
+      
+      state.cycleKeyScale();
+      expect(state.get('keyScale')).toBe('minor');
+      
+      state.cycleKeyScale();
+      expect(state.get('keyScale')).toBe('dorian');
+    });
+
+    it('should only accept valid key roots', () => {
+      state.setKeyRoot('D');
+      expect(state.get('keyRoot')).toBe('D');
+      
+      state.setKeyRoot('X'); // Invalid
+      expect(state.get('keyRoot')).toBe('D'); // Unchanged
+    });
+
+    it('should only accept valid scale types', () => {
+      state.setKeyScale('minor');
+      expect(state.get('keyScale')).toBe('minor');
+      
+      state.setKeyScale('invalid');
+      expect(state.get('keyScale')).toBe('minor'); // Unchanged
+    });
+
+    it('should notify listeners on key state changes', () => {
+      listener.mockClear();
+      
+      state.setKeyEnabled(true);
+      expect(listener).toHaveBeenCalledWith(
+        expect.any(Object),
+        ['keyEnabled']
+      );
+
+      listener.mockClear();
+      state.setKeyRoot('G');
+      expect(listener).toHaveBeenCalledWith(
+        expect.any(Object),
+        ['keyRoot']
+      );
+
+      listener.mockClear();
+      state.setKeyScale('dorian');
+      expect(listener).toHaveBeenCalledWith(
+        expect.any(Object),
+        ['keyScale']
+      );
     });
   });
 });
