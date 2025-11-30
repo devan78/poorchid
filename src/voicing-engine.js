@@ -1,25 +1,38 @@
 export class VoicingEngine {
   /**
-   * Adjusts the octave of each note to be closest to the centerNote.
-   * @param {number[]} notes - Array of MIDI note numbers
-   * @param {number} centerNote - The target center pitch (MIDI number)
-   * @returns {number[]} - Array of voiced MIDI notes
+   * Builds a voiced chord by inverting notes toward a target register.
+   * Moves the lowest note up an octave or the highest note down to keep the stack
+   * in a small window around the dial value, then gently recenters the whole chord.
+   * @param {number[]} notes - Array of MIDI note numbers (ascending)
+   * @param {number} centerNote - Target register from the voicing dial (MIDI number)
+   * @returns {number[]} - Array of voiced MIDI notes (ascending)
    */
   getVoicing(notes, centerNote) {
-    return notes.map(note => {
-      // Normalize note to 0-11 range (chromatic class)
-      const chroma = note % 12;
-      
-      // Find the octave of this chroma closest to centerNote
-      // centerNote = 12 * octave + chroma_center
-      // We want 12 * x + chroma approx centerNote
-      // 12 * x approx centerNote - chroma
-      // x approx (centerNote - chroma) / 12
-      
-      const approxOctave = Math.round((centerNote - chroma) / 12);
-      const candidate = chroma + (approxOctave * 12);
-      
-      return candidate;
-    }).sort((a, b) => a - b);
+    if (!notes || notes.length === 0) return [];
+    const target = Math.max(24, Math.min(96, centerNote || 60)); // keep target sane
+    const voiced = [...notes].sort((a, b) => a - b);
+
+    // Pull the stack toward the target window by inverting extremes
+    const window = 7; // ~ a fifth either side
+    let guard = 0;
+    while (guard < 24) { // prevent runaway loops
+      const lowest = voiced[0];
+      const highest = voiced[voiced.length - 1];
+      if (lowest < target - window) {
+        voiced[0] = lowest + 12;
+        voiced.sort((a, b) => a - b);
+      } else if (highest > target + window) {
+        voiced[voiced.length - 1] = highest - 12;
+        voiced.sort((a, b) => a - b);
+      } else {
+        break;
+      }
+      guard++;
+    }
+
+    // Nudge whole chord toward the dial position to avoid drift
+    const avg = voiced.reduce((sum, n) => sum + n, 0) / voiced.length;
+    const shiftOctaves = Math.round((target - avg) / 12);
+    return voiced.map(n => n + shiftOctaves * 12).sort((a, b) => a - b);
   }
 }

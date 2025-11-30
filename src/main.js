@@ -87,6 +87,7 @@ export class PoorchidApp {
       setBassVoicing: (val) => this.stateManager.setBassVoicing(val),
       setBassVolume: (val) => this.stateManager.setBassVolume(val),
       setVolume: (val) => this.stateManager.setVolume(val),
+      toggleFlavour: () => this.stateManager.toggleFlavour(),
       toggleBass: () => this.stateManager.toggleBass(),
       cycleBassMode: () => this.stateManager.cycleBassMode(),
       cyclePatch: (direction) => this.stateManager.cyclePatch(direction),
@@ -138,6 +139,7 @@ export class PoorchidApp {
     this.audio.setFxLevels(this.stateManager.state.fxLevels);
     this.audio.setFxBpm(this.stateManager.state.bpm);
     this.audio.setFxBypass(this.stateManager.state.currentEffect === 'direct');
+    this.audio.setFlavourEnabled(this.stateManager.state.flavourEnabled);
     
     // Subscribe to State Changes
     this.stateManager.subscribe((state, changedProps) => {
@@ -181,6 +183,11 @@ export class PoorchidApp {
   }
 
   handleChordTypePress(type) {
+    // If key mode is on and auto-chords are active, switch to manual so user choice sticks
+    if (this.stateManager.get('keyEnabled') && this.stateManager.get('keyAutoChords')) {
+      this.stateManager.setKeyAutoChords(false);
+    }
+
     this.heldChordType = type;
     const playstyle = this.stateManager.get('playstyle');
     const hasHeldNotes = this.stateManager.state.activeMidiNotes.size > 0;
@@ -217,7 +224,7 @@ export class PoorchidApp {
   handleStateChange(state, changedProps) {
     // State key validation
     const validKeys = [
-      'powered','root','type','extensions','voicingCenter','filterCutoff','midiConnected','activeMidiNotes','looperState','isPlaying','bassEnabled','bassMode','bassVoicing','bassVolume','volume','currentPatch','keyEnabled','keyRoot','keyScale','keyAutoChords','performMode','arpPattern','arpDivision','strumSpeed','rhythmPattern','playstyle','bpm','metronomeOn','currentEffect','fxLocked','fxLevels'
+      'powered','root','type','extensions','voicingCenter','filterCutoff','midiConnected','activeMidiNotes','looperState','isPlaying','bassEnabled','bassMode','bassVoicing','bassVolume','volume','flavourEnabled','currentPatch','keyEnabled','keyRoot','keyScale','keyAutoChords','performMode','arpPattern','arpDivision','strumSpeed','rhythmPattern','playstyle','bpm','metronomeOn','currentEffect','fxLocked','fxLevels'
     ];
     for (const key of changedProps) {
       if (!validKeys.includes(key)) {
@@ -234,6 +241,9 @@ export class PoorchidApp {
     }
     if (changedProps.includes('volume')) {
       this.audio.setVolume(state.volume);
+    }
+    if (changedProps.includes('flavourEnabled')) {
+      this.audio.setFlavourEnabled(state.flavourEnabled);
     }
     if (changedProps.includes('currentPatch')) {
       this.audio.setPatch(state.currentPatch);
@@ -523,14 +533,11 @@ export class PoorchidApp {
     if (!this.stateManager.get('powered')) return;
     
     // Extension triggers (low notes below the keyboard range)
-    if (note < MIDI_NOTE_MIN) {
-      const ext = MIDI_EXTENSION_MAP[note];
-      if (ext) this.stateManager.setExtension(ext, true);
+    const ext = MIDI_EXTENSION_MAP[note];
+    if (ext) {
+      this.stateManager.setExtension(ext, true);
       return;
     }
-    
-    // Full keyboard range
-    if (note > MIDI_NOTE_MAX) return;
 
     const noteName = this.logic.getNoteName(note);
     if (!noteName) return;
@@ -559,15 +566,6 @@ export class PoorchidApp {
     const rootChanged = this.stateManager.get('root') !== noteName;
     this.stateManager.setRoot(noteName);
     
-    // Adjust voicing center based on which octave was played
-    // Playing higher shifts voicing up, playing lower shifts down
-    const octaveOffset = note - MIDI_REFERENCE_OCTAVE;
-    const currentVoicing = this.stateManager.get('voicingCenter');
-    const targetVoicing = 60 + octaveOffset; // Center around the played octave
-    // Smooth blend: move voicing towards the played octave
-    const newVoicing = Math.max(36, Math.min(84, Math.round(currentVoicing * 0.3 + targetVoicing * 0.7)));
-    this.stateManager.setVoicingCenter(newVoicing);
-    
     // If root didn't change, we still need to trigger playback
     if (!rootChanged) {
       this.playCurrentChord();
@@ -579,14 +577,11 @@ export class PoorchidApp {
   handleMidiNoteOff(note) {
     if (!this.stateManager.get('powered')) return;
     
-    if (note < MIDI_NOTE_MIN) {
-      const ext = MIDI_EXTENSION_MAP[note];
-      if (ext) this.stateManager.setExtension(ext, false);
+    const ext = MIDI_EXTENSION_MAP[note];
+    if (ext) {
+      this.stateManager.setExtension(ext, false);
       return;
     }
-    
-    // Full keyboard range
-    if (note > MIDI_NOTE_MAX) return;
     
     const noteName = this.logic.getNoteName(note);
     if (noteName) {
@@ -632,12 +627,7 @@ export class PoorchidApp {
   }
 
   handleMidiPitchBend(lsb, msb) {
-    const val = (msb << 7) + lsb;
-    const min = 36;
-    const max = 84;
-    const normalized = val / 16383;
-    const voicing = min + (normalized * (max - min));
-    this.stateManager.setVoicingCenter(Math.round(voicing));
+    // Pitch strip ignored for voicing: keep dial-set position stable
   }
 
   // --- Keyboard Handling ---
@@ -654,6 +644,9 @@ export class PoorchidApp {
 
     const type = TYPE_KEY_MAP[key];
     if (type) {
+      if (this.stateManager.get('keyEnabled') && this.stateManager.get('keyAutoChords')) {
+        this.stateManager.setKeyAutoChords(false);
+      }
       this.stateManager.setChordType(type);
       return;
     }

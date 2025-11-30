@@ -18,6 +18,7 @@ export class PoorchidState {
       bassVoicing: 0, // Octave offset: -2 to +2 (semitones -24 to +24)
       bassVolume: 60, // 0-99 independent volume
       volume: 70, // Master volume 0-99
+      flavourEnabled: true, // Hidden master flavour chain
       currentPatch: DEFAULT_PATCH, // Current sound patch
       keyEnabled: false, // Key lock mode on/off
       keyRoot: 'C', // Current key root (C, C#, D, etc.)
@@ -430,5 +431,17 @@ export class PoorchidState {
       this.state.fxLocked = locked;
       this.notify(['fxLocked']);
     }
+  }
+
+  // Flavour chain
+  setFlavourEnabled(enabled) {
+    if (this.state.flavourEnabled !== enabled) {
+      this.state.flavourEnabled = enabled;
+      this.notify(['flavourEnabled']);
+    }
+  }
+
+  toggleFlavour() {
+    this.setFlavourEnabled(!this.state.flavourEnabled);
   }
 }

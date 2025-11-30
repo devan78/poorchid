@@ -178,6 +178,24 @@ export class PoorchidUI {
     return patch ? patch.name : patchId;
   }
 
+  getVoicingRotation(voicingCenter) {
+    // Map MIDI 36-84 to -135..135 degrees
+    const min = 36;
+    const max = 84;
+    const clamped = Math.max(min, Math.min(max, voicingCenter || 60));
+    const t = (clamped - min) / (max - min);
+    return t * 270 - 135;
+  }
+
+  getBassVoicingRotation(bassVoicing) {
+    // Map -24..24 to -135..135 degrees
+    const min = -24;
+    const max = 24;
+    const clamped = Math.max(min, Math.min(max, bassVoicing || 0));
+    const t = (clamped - min) / (max - min);
+    return t * 270 - 135;
+  }
+
   getPerformModeDisplay(state) {
     if (state.performMode === 'direct') {
       return 'DIRECT';
@@ -203,9 +221,16 @@ export class PoorchidUI {
 
   getKeyDisplay(state) {
     if (!state.keyEnabled) return 'KEY: OFF';
-    const scale = state.keyScale.toUpperCase().slice(0, 3);
+    const label = state.keyAutoChords
+      ? state.keyScale.toUpperCase().slice(0, 3)
+      : ({
+          diminished: 'DIM',
+          minor: 'MIN',
+          major: 'MAJ',
+          suspended: 'SUS'
+        }[state.type] || state.type.toUpperCase().slice(0, 3));
     const mode = state.keyAutoChords ? 'AUTO' : 'MAN';
-    return `KEY: ${state.keyRoot} ${scale} ${mode}`;
+    return `KEY: ${state.keyRoot} ${label} ${mode}`;
   }
 
   getFxDisplay(state) {
@@ -384,6 +409,13 @@ export class PoorchidUI {
       this._currentVolume = state.volume;
     }
 
+    const flavourToggle = document.getElementById('flavour-toggle');
+    if (flavourToggle) {
+      flavourToggle.classList.toggle('active', state.flavourEnabled);
+      flavourToggle.textContent = state.flavourEnabled ? 'Flavour On' : 'Flavour Off';
+      flavourToggle.title = state.flavourEnabled ? 'Secret flavour chain enabled' : 'Secret flavour chain bypassed';
+    }
+
     // Hidden controls (for keyboard shortcuts to still work)
     const pwrBtn = this.container.querySelector('#power-btn');
     if (pwrBtn) {
@@ -463,6 +495,20 @@ export class PoorchidUI {
     updateSlider('filter-dial', state.filterCutoff);
     updateSlider('bass-voicing-dial', state.bassVoicing);
     updateSlider('bass-vol-dial', state.bassVolume);
+
+    const voicingKnob = this.container.querySelector('#voicing-knob');
+    if (voicingKnob) {
+      const rotation = this.getVoicingRotation(state.voicingCenter);
+      voicingKnob.style.setProperty('--dial-rotation', `${rotation}deg`);
+      this._voicingDialValue = state.voicingCenter;
+    }
+
+    const bassVoicingKnob = this.container.querySelector('#bass-knob');
+    if (bassVoicingKnob) {
+      const rotation = this.getBassVoicingRotation(state.bassVoicing);
+      bassVoicingKnob.style.setProperty('--dial-rotation', `${rotation}deg`);
+      this._bassVoicingDialValue = state.bassVoicing;
+    }
   }
 
 
@@ -931,5 +977,76 @@ export class PoorchidUI {
         volumeHeld = previousHold;
       }
     }, { passive: false });
+
+    // === DIAL DRAG & WHEEL (Voicing + Bass Voicing) ===
+    const clamp = (val, min, max) => Math.max(min, Math.min(max, val));
+    const dialStep = (fine) => (fine ? 1 : 2);
+
+    const handleDialDelta = (type, delta, fine) => {
+      if (type === 'voicing') {
+        const current = this._voicingDialValue ?? this.state?.voicingCenter ?? 60;
+        const next = clamp(current + delta * dialStep(fine), 36, 84);
+        if (next !== current) {
+          this._voicingDialValue = next;
+          this.actions.setVoicing(next);
+        }
+      } else if (type === 'bassVoicing') {
+        const current = this._bassVoicingDialValue ?? this.state?.bassVoicing ?? 0;
+        const next = clamp(current + delta * dialStep(fine), -24, 24);
+        if (next !== current) {
+          this._bassVoicingDialValue = next;
+          this.actions.setBassVoicing(next);
+        }
+      }
+    };
+
+    let dialDrag = null;
+
+    this.container.addEventListener('mousedown', (e) => {
+      const knob = e.target.closest('#voicing-knob, #bass-knob');
+      if (knob) {
+        e.preventDefault();
+        dialDrag = {
+          knob,
+          type: knob.id === 'voicing-knob' ? 'voicing' : 'bassVoicing',
+          lastY: e.clientY,
+          fine: e.shiftKey
+        };
+        document.body.style.cursor = 'ns-resize';
+      }
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (!dialDrag) return;
+      const deltaY = dialDrag.lastY - e.clientY;
+      const sensitivity = 3;
+      const delta = deltaY / sensitivity;
+      if (Math.abs(delta) >= 1) {
+        handleDialDelta(dialDrag.type, delta, dialDrag.fine);
+        dialDrag.lastY = e.clientY;
+      }
+    });
+
+    document.addEventListener('mouseup', () => {
+      if (dialDrag) {
+        dialDrag = null;
+        document.body.style.cursor = '';
+      }
+    });
+
+    this.container.addEventListener('wheel', (e) => {
+      const knob = e.target.closest('#voicing-knob, #bass-knob');
+      if (knob) {
+        e.preventDefault();
+        const type = knob.id === 'voicing-knob' ? 'voicing' : 'bassVoicing';
+        const delta = e.deltaY > 0 ? -1 : 1;
+        handleDialDelta(type, delta, e.shiftKey);
+      }
+    }, { passive: false });
+
+    const flavourToggle = document.getElementById('flavour-toggle');
+    if (flavourToggle) {
+      flavourToggle.addEventListener('click', () => this.actions.toggleFlavour());
+    }
   }
 }

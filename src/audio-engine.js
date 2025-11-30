@@ -21,6 +21,50 @@ export class AudioEngine {
     this.masterGain = this.ctx.createGain();
     this.masterGain.gain.value = 0.5;
 
+    // Secret flavour chain (glue + tone)
+    this.flavourEnabled = true;
+    this.flavourInput = this.ctx.createGain();
+    this.flavourOutput = this.ctx.createGain();
+    this.flavourBypassGain = this.ctx.createGain();
+    this.flavourBypassGain.gain.value = 0;
+
+    this.flavourHighpass = this.ctx.createBiquadFilter();
+    this.flavourHighpass.type = 'highpass';
+    this.flavourHighpass.frequency.value = 24;
+    this.flavourHighpass.Q.value = 0.55;
+
+    this.flavourLowShelf = this.ctx.createBiquadFilter();
+    this.flavourLowShelf.type = 'lowshelf';
+    this.flavourLowShelf.frequency.value = 90;
+    this.flavourLowShelf.gain.value = 0.35;
+
+    this.flavourHighShelf = this.ctx.createBiquadFilter();
+    this.flavourHighShelf.type = 'highshelf';
+    this.flavourHighShelf.frequency.value = 11000;
+    this.flavourHighShelf.gain.value = 0.4;
+
+    this.flavourDryGain = this.ctx.createGain();
+    this.flavourDryGain.gain.value = 0.9;
+
+    this.flavourWetGain = this.ctx.createGain();
+    this.flavourWetGain.gain.value = 0.1;
+
+    this.flavourMix = this.ctx.createGain();
+
+    this.flavourSaturation = this.ctx.createWaveShaper();
+    this.flavourSaturation.curve = this.createSaturationCurve(0.08);
+    this.flavourSaturation.oversample = '4x';
+
+    this.flavourLimiter = this.ctx.createDynamicsCompressor();
+    this.flavourLimiter.threshold.value = -0.5;
+    this.flavourLimiter.ratio.value = 1.8;
+    this.flavourLimiter.knee.value = 14;
+    this.flavourLimiter.attack.value = 0.005;
+    this.flavourLimiter.release.value = 0.25;
+
+    this.flavourTrim = this.ctx.createGain();
+    this.flavourTrim.gain.value = 0.95;
+
     // Compressor (gentle, glue-like)
     this.compressor = this.ctx.createDynamicsCompressor();
     this.compressor.threshold.value = -18;
@@ -47,8 +91,27 @@ export class AudioEngine {
     this.voiceInput.connect(this.fxChain.input);
     this.fxChain.connect(this.masterFilter);
     this.masterFilter.connect(this.compressor);
-    this.compressor.connect(this.masterGain);
+    this.compressor.connect(this.flavourInput);
+    this.compressor.connect(this.flavourBypassGain);
+
+    this.flavourInput.connect(this.flavourHighpass);
+    this.flavourHighpass.connect(this.flavourLowShelf);
+    this.flavourLowShelf.connect(this.flavourHighShelf);
+    this.flavourHighShelf.connect(this.flavourSaturation);
+    this.flavourHighShelf.connect(this.flavourDryGain);
+
+    this.flavourSaturation.connect(this.flavourWetGain);
+    this.flavourWetGain.connect(this.flavourMix);
+    this.flavourDryGain.connect(this.flavourMix);
+
+    this.flavourMix.connect(this.flavourLimiter);
+    this.flavourLimiter.connect(this.flavourTrim);
+    this.flavourTrim.connect(this.flavourOutput);
+
+    this.flavourOutput.connect(this.masterGain);
+    this.flavourBypassGain.connect(this.masterGain);
     this.masterGain.connect(this.ctx.destination);
+    this.setFlavourEnabled(this.flavourEnabled);
     
     // Global Drift LFO (Tape wobble - enhanced)
     this.driftLFO = this.ctx.createOscillator();
@@ -91,6 +154,16 @@ export class AudioEngine {
     if (this.fxChain) {
       this.fxChain.setBypass(bypass);
     }
+  }
+
+  setFlavourEnabled(enabled) {
+    this.flavourEnabled = !!enabled;
+    if (!this.flavourOutput || !this.flavourBypassGain) return;
+    const now = this.ctx.currentTime;
+    const on = this.flavourEnabled ? 1 : 0;
+    const off = this.flavourEnabled ? 0 : 1;
+    this.flavourOutput.gain.setTargetAtTime(on, now, 0.02);
+    this.flavourBypassGain.gain.setTargetAtTime(off, now, 0.02);
   }
 
   resume() {
@@ -234,19 +307,19 @@ export class AudioEngine {
 
     // Bass Filter
     filter.type = 'lowpass';
-    filter.frequency.value = 400; // Deep bass
-    filter.Q.value = 2; // Resonant punch
+    filter.frequency.value = 320; // Deep bass
+    filter.Q.value = 1.2; // Softer resonance
 
     // Envelope (Punchy)
     const now = this.ctx.currentTime + time;
     gain.gain.setValueAtTime(0, now);
-    gain.gain.linearRampToValueAtTime(0.8, now + 0.02); // Fast Attack
-    gain.gain.exponentialRampToValueAtTime(0.5, now + 0.2); // Decay
-    gain.gain.setValueAtTime(0.5, now + 0.2); // Sustain
+    gain.gain.linearRampToValueAtTime(0.55, now + 0.03); // Slightly slower, lower peak
+    gain.gain.exponentialRampToValueAtTime(0.38, now + 0.22); // Decay
+    gain.gain.setValueAtTime(0.38, now + 0.22); // Sustain
 
     // Filter Envelope (Wow effect)
-    filter.frequency.setValueAtTime(400, now);
-    filter.frequency.exponentialRampToValueAtTime(200, now + 0.2);
+    filter.frequency.setValueAtTime(340, now);
+    filter.frequency.exponentialRampToValueAtTime(190, now + 0.24);
 
     osc.connect(filter);
     filter.connect(gain);
@@ -416,5 +489,16 @@ export class AudioEngine {
     // Exponential curve for more natural volume control (0-99 range)
     const gain = Math.pow(val / 99, 2);
     this.masterGain.gain.setTargetAtTime(gain, this.ctx.currentTime, 0.02);
+  }
+
+  createSaturationCurve(amount = 1) {
+    const k = Math.max(0.01, amount) * 12;
+    const samples = 1024;
+    const curve = new Float32Array(samples);
+    for (let i = 0; i < samples; i++) {
+      const x = (i * 2) / samples - 1;
+      curve[i] = ((1 + k) * x) / (1 + k * Math.abs(x));
+    }
+    return curve;
   }
 }
