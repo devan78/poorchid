@@ -534,6 +534,7 @@ export class Strummer {
     this.strumTime = 50; // ms between notes (0-200)
     this.direction = 'down'; // down = low to high, up = high to low
     this.activeNotes = new Set();
+    this.pendingTimers = [];
   }
   
   /**
@@ -565,6 +566,9 @@ export class Strummer {
    * Strum a chord
    */
   strum(notes, velocity = 100) {
+    this.clearPending();
+    this.release();
+
     // Sort notes
     let sortedNotes = [...notes].sort((a, b) => a - b);
     
@@ -577,12 +581,13 @@ export class Strummer {
     sortedNotes.forEach((note, index) => {
       const delay = index * this.strumTime;
       
-      setTimeout(() => {
+      const timer = setTimeout(() => {
         // Velocity can decrease slightly for later notes
         const noteVel = Math.max(60, velocity - (index * 5));
         this.onNoteOn(note, noteVel);
         this.activeNotes.add(note);
       }, delay);
+      this.pendingTimers.push(timer);
     });
   }
   
@@ -590,9 +595,15 @@ export class Strummer {
    * Release all strummed notes
    */
   release() {
+    this.clearPending();
     this.activeNotes.forEach(note => {
       this.onNoteOff(note);
     });
     this.activeNotes.clear();
+  }
+
+  clearPending() {
+    this.pendingTimers.forEach(id => clearTimeout(id));
+    this.pendingTimers = [];
   }
 }

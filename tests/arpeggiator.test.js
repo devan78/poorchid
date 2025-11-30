@@ -204,6 +204,23 @@ describe('Strummer', () => {
       expect(onNoteOff).toHaveBeenCalledTimes(3);
       expect(strummer.activeNotes.size).toBe(0);
     });
+
+    it('clears pending timers on new strum', () => {
+      vi.useFakeTimers();
+
+      strummer.setSpeed(0); // slow, long delays
+      strummer.strum([60, 64, 67]);
+      expect(strummer.pendingTimers.length).toBeGreaterThan(0);
+
+      // Trigger another strum immediately
+      strummer.strum([65, 69, 72]);
+      // Pending timers should have been cleared and replaced
+      expect(strummer.pendingTimers.length).toBeGreaterThan(0);
+      vi.runAllTimers();
+      expect(onNoteOn).toHaveBeenCalledTimes(3);
+
+      vi.useRealTimers();
+    });
   });
 });
 

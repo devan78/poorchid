@@ -72,6 +72,13 @@ header p {
   text-transform: uppercase;
 }
 
+.version-tag {
+  font-size: 0.65rem;
+  color: #666;
+  letter-spacing: 0.05em;
+  margin-left: 0.4rem;
+}
+
 /* Main Synth Chassis */
 #synth-interface {
   background: linear-gradient(to bottom, var(--chassis-bg), var(--chassis-dark));
@@ -714,6 +721,11 @@ header p {
   text-shadow: 0 0 6px rgba(255, 152, 0, 0.5);
 }
 
+.oled-bass-mode.inactive {
+  color: #444;
+  text-shadow: none;
+}
+
 .oled-key-mode {
   font-size: 0.45rem;
   color: #666;
@@ -740,6 +752,29 @@ header p {
 .oled-perform-mode.active {
   color: #ffeb3b;
   text-shadow: 0 0 6px rgba(255, 235, 59, 0.5);
+}
+
+.oled-fx {
+  font-size: 0.45rem;
+  color: #666;
+  letter-spacing: 0.1em;
+  text-shadow: none;
+  font-weight: 500;
+  transition: color 0.15s ease;
+}
+
+.oled-fx.active {
+  color: #ffeb3b;
+  text-shadow: 0 0 6px rgba(255, 235, 59, 0.5);
+}
+
+.oled-fx-level {
+  font-size: 0.45rem;
+  color: #888;
+  letter-spacing: 0.1em;
+  text-shadow: none;
+  font-weight: 500;
+  text-align: right;
 }
 
 .oled-bpm {

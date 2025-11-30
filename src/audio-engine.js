@@ -1,5 +1,6 @@
 import { midiToFreq } from './utils';
 import { PATCHES, DEFAULT_PATCH } from './patch-manager';
+import { FXChain } from './effects.js';
 
 export class AudioEngine {
   constructor() {
@@ -14,8 +15,8 @@ export class AudioEngine {
     this.currentPatch = PATCHES[DEFAULT_PATCH];
     this.patchId = DEFAULT_PATCH;
     
-    // === TAME IMPALA CHAIN ===
-    // Voices -> Phaser -> Chorus -> Tape Saturation -> Filter -> Compressor -> Master
+    // === AUDIO CHAIN ===
+    // Voices -> FX Chain -> Master Filter -> Compressor -> Master Output
     
     this.masterGain = this.ctx.createGain();
     this.masterGain.gain.value = 0.5;
@@ -33,96 +34,18 @@ export class AudioEngine {
     this.masterFilter.type = 'lowpass';
     this.masterFilter.frequency.value = 3000;
     this.masterFilter.Q.value = 0.7;
-
-    // Tape Saturation (waveshaper for warmth)
-    this.tapeWaveshaper = this.ctx.createWaveShaper();
-    this.tapeWaveshaper.curve = this.createTapeSaturationCurve(0.4);
-    this.tapeWaveshaper.oversample = '2x';
     
-    // Chorus effect (stereo widening, Tame Impala shimmer)
-    this.chorusDelay = this.ctx.createDelay(0.05);
-    this.chorusDelay.delayTime.value = 0.012;
-    this.chorusLFO = this.ctx.createOscillator();
-    this.chorusLFO.type = 'sine';
-    this.chorusLFO.frequency.value = 0.8;
-    this.chorusDepth = this.ctx.createGain();
-    this.chorusDepth.gain.value = 0.003;
-    this.chorusLFO.connect(this.chorusDepth);
-    this.chorusDepth.connect(this.chorusDelay.delayTime);
-    this.chorusLFO.start();
+    // FX Chain (controllable effects)
+    this.fxChain = new FXChain(this.ctx);
     
-    this.chorusMix = this.ctx.createGain();
-    this.chorusMix.gain.value = 0.4;
-    
-    this.chorusDry = this.ctx.createGain();
-    this.chorusDry.gain.value = 0.7;
-    
-    // Phaser (the Kevin Parker secret sauce)
-    this.phaserFilters = [];
-    this.phaserLFO = this.ctx.createOscillator();
-    this.phaserLFO.type = 'sine';
-    this.phaserLFO.frequency.value = 0.3; // Slow, dreamy sweep
-    this.phaserDepth = this.ctx.createGain();
-    this.phaserDepth.gain.value = 800;
-    this.phaserLFO.connect(this.phaserDepth);
-    this.phaserLFO.start();
-    
-    // Create 4-stage phaser (allpass filters)
-    this.phaserInput = this.ctx.createGain();
-    this.phaserInput.gain.value = 1;
-    let lastNode = this.phaserInput;
-    
-    for (let i = 0; i < 4; i++) {
-      const allpass = this.ctx.createBiquadFilter();
-      allpass.type = 'allpass';
-      allpass.frequency.value = 1000;
-      allpass.Q.value = 0.5;
-      this.phaserDepth.connect(allpass.frequency);
-      lastNode.connect(allpass);
-      lastNode = allpass;
-      this.phaserFilters.push(allpass);
-    }
-    
-    // Phaser feedback
-    this.phaserFeedback = this.ctx.createGain();
-    this.phaserFeedback.gain.value = 0.4;
-    lastNode.connect(this.phaserFeedback);
-    this.phaserFeedback.connect(this.phaserFilters[0]);
-    
-    // Phaser wet/dry mix
-    this.phaserWet = ctx => lastNode;
-    this.phaserDry = this.ctx.createGain();
-    this.phaserDry.gain.value = 0.6;
-    this.phaserWetGain = this.ctx.createGain();
-    this.phaserWetGain.gain.value = 0.5;
-    lastNode.connect(this.phaserWetGain);
-    
-    // === CONNECT THE CHAIN ===
     // Input stage (where voices connect)
     this.voiceInput = this.ctx.createGain();
     this.voiceInput.gain.value = 1;
     
-    // Voice -> Phaser
-    this.voiceInput.connect(this.phaserInput);
-    this.voiceInput.connect(this.phaserDry);
-    
-    // Phaser -> Chorus
-    const phaserOut = this.ctx.createGain();
-    this.phaserWetGain.connect(phaserOut);
-    this.phaserDry.connect(phaserOut);
-    
-    phaserOut.connect(this.chorusDelay);
-    phaserOut.connect(this.chorusDry);
-    this.chorusDelay.connect(this.chorusMix);
-    
-    // Chorus -> Tape Saturation
-    const chorusOut = this.ctx.createGain();
-    this.chorusMix.connect(chorusOut);
-    this.chorusDry.connect(chorusOut);
-    chorusOut.connect(this.tapeWaveshaper);
-    
-    // Tape -> Filter -> Compressor -> Master
-    this.tapeWaveshaper.connect(this.masterFilter);
+    // === CONNECT THE CHAIN ===
+    // Voice -> FX Chain -> Filter -> Compressor -> Master
+    this.voiceInput.connect(this.fxChain.input);
+    this.fxChain.connect(this.masterFilter);
     this.masterFilter.connect(this.compressor);
     this.compressor.connect(this.masterGain);
     this.masterGain.connect(this.ctx.destination);
@@ -141,20 +64,33 @@ export class AudioEngine {
     // Bass Engine
     this.bassGain = this.ctx.createGain();
     this.bassGain.gain.value = 0.6;
-    this.bassGain.connect(this.compressor); // Bass bypasses phaser/chorus
+    this.bassGain.connect(this.compressor); // Bass bypasses FX
     this.bassVoice = null;
   }
 
-  // Tape saturation curve - soft clipping for warmth
-  createTapeSaturationCurve(amount) {
-    const samples = 256;
-    const curve = new Float32Array(samples);
-    for (let i = 0; i < samples; i++) {
-      const x = (i * 2) / samples - 1;
-      // Soft saturation formula
-      curve[i] = (Math.PI + amount) * x / (Math.PI + amount * Math.abs(x));
+  // FX Control Methods
+  setFxLevel(effectName, level) {
+    if (this.fxChain) {
+      this.fxChain.setLevel(effectName, level);
     }
-    return curve;
+  }
+
+  setFxLevels(levels) {
+    if (this.fxChain) {
+      this.fxChain.setLevels(levels);
+    }
+  }
+
+  setFxBpm(bpm) {
+    if (this.fxChain) {
+      this.fxChain.setBpm(bpm);
+    }
+  }
+
+  setFxBypass(bypass) {
+    if (this.fxChain) {
+      this.fxChain.setBypass(bypass);
+    }
   }
 
   resume() {

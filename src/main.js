@@ -65,8 +65,11 @@ export class PoorchidApp {
         }
       }
     });
-
+    
     this.currentRecordedNotes = new Set();
+    this.heldChordType = null;
+    this.playstyleForceSingle = false;
+    this.playstyleOverrideType = null;
 
     // Bound event handlers for cleanup
     this._boundKeyDown = (e) => this.handleKeyDown(e);
@@ -88,8 +91,13 @@ export class PoorchidApp {
       cycleBassMode: () => this.stateManager.cycleBassMode(),
       cyclePatch: (direction) => this.stateManager.cyclePatch(direction),
       toggleKey: () => this.stateManager.toggleKey(),
+      toggleKeyAutoChords: () => this.stateManager.toggleKeyAutoChords(),
       cycleKeyRoot: (direction) => this.stateManager.cycleKeyRoot(direction),
       cycleKeyScale: () => this.stateManager.cycleKeyScale(),
+      setPlaystyle: (style) => this.stateManager.setPlaystyle(style),
+      cyclePlaystyle: () => this.stateManager.cyclePlaystyle(),
+      pressChordType: (type) => this.handleChordTypePress(type),
+      releaseChordType: (type) => this.handleChordTypeRelease(type),
       // Performance mode actions
       cyclePerformMode: () => this.stateManager.cyclePerformMode(),
       cycleArpPattern: () => this.stateManager.cycleArpPattern(),
@@ -98,6 +106,11 @@ export class PoorchidApp {
       setBpm: (bpm) => this.stateManager.setBpm(bpm),
       tapTempo: () => this.tapTempo(),
       toggleMetronome: () => this.stateManager.toggleMetronome(),
+      // FX actions
+      cycleFxType: () => this.stateManager.cycleCurrentEffect(),
+      setFxLevel: (effectName, level) => this.stateManager.setFxLevel(effectName, level),
+      adjustFxLevel: (effectName, delta) => this.stateManager.adjustFxLevel(effectName, delta),
+      toggleFxLock: () => this.stateManager.toggleFxLock(),
       // Looper actions
       toggleLoopRecord: () => this.toggleLoopRecord(),
       toggleLoopPlay: () => this.toggleLoopPlay(),
@@ -122,6 +135,9 @@ export class PoorchidApp {
     this.audio.setVolume(this.stateManager.state.volume);
     this.audio.setBassVolume(this.stateManager.state.bassVolume);
     this.audio.setFilterCutoff(this.stateManager.state.filterCutoff);
+    this.audio.setFxLevels(this.stateManager.state.fxLevels);
+    this.audio.setFxBpm(this.stateManager.state.bpm);
+    this.audio.setFxBypass(this.stateManager.state.currentEffect === 'direct');
     
     // Subscribe to State Changes
     this.stateManager.subscribe((state, changedProps) => {
@@ -155,7 +171,60 @@ export class PoorchidApp {
     }
   }
 
+  getPlaybackOptions() {
+    const state = this.stateManager.state;
+    const keyChordActive = state.keyEnabled && state.keyAutoChords;
+    return {
+      forceSingle: keyChordActive ? false : this.playstyleForceSingle,
+      overrideType: keyChordActive ? null : this.playstyleOverrideType
+    };
+  }
+
+  handleChordTypePress(type) {
+    this.heldChordType = type;
+    const playstyle = this.stateManager.get('playstyle');
+    const hasHeldNotes = this.stateManager.state.activeMidiNotes.size > 0;
+
+    if (playstyle === 'simple' && hasHeldNotes) {
+      // Cannot change chord type mid-hold in simple mode
+      return;
+    }
+
+    this.stateManager.setChordType(type);
+
+    if ((playstyle === 'advanced' || playstyle === 'free') && hasHeldNotes) {
+      this.playstyleForceSingle = false;
+      this.playstyleOverrideType = type;
+      this.playCurrentChord({ forceSingle: false, overrideType: type });
+    }
+  }
+
+  handleChordTypeRelease(type) {
+    if (this.heldChordType === type) {
+      this.heldChordType = null;
+    }
+
+    const playstyle = this.stateManager.get('playstyle');
+    const hasHeldNotes = this.stateManager.state.activeMidiNotes.size > 0;
+
+    if (playstyle === 'free' && hasHeldNotes) {
+      this.playstyleForceSingle = true;
+      this.playstyleOverrideType = null;
+      this.playCurrentChord({ forceSingle: true });
+    }
+  }
+
   handleStateChange(state, changedProps) {
+    // State key validation
+    const validKeys = [
+      'powered','root','type','extensions','voicingCenter','filterCutoff','midiConnected','activeMidiNotes','looperState','isPlaying','bassEnabled','bassMode','bassVoicing','bassVolume','volume','currentPatch','keyEnabled','keyRoot','keyScale','keyAutoChords','performMode','arpPattern','arpDivision','strumSpeed','rhythmPattern','playstyle','bpm','metronomeOn','currentEffect','fxLocked','fxLevels'
+    ];
+    for (const key of changedProps) {
+      if (!validKeys.includes(key)) {
+        console.warn(`[Poorchid] Unknown state key changed: '${key}'`);
+      }
+    }
+
     // Audio Parameter Updates
     if (changedProps.includes('filterCutoff')) {
       this.audio.setFilterCutoff(state.filterCutoff);
@@ -174,6 +243,7 @@ export class PoorchidApp {
     if (changedProps.includes('bpm')) {
       this.arpeggiator.setBpm(state.bpm);
       this.patternPlayer.setBpm(state.bpm);
+      this.audio.setFxBpm(state.bpm);
     }
     if (changedProps.includes('arpPattern')) {
       this.arpeggiator.setPattern(state.arpPattern);
@@ -203,6 +273,31 @@ export class PoorchidApp {
         this.strummer.release();
       }
     }
+    
+    // FX parameter updates
+    if (changedProps.includes('fxLevels')) {
+      this.audio.setFxLevels(state.fxLevels);
+    }
+    if (changedProps.includes('currentEffect')) {
+      const bypass = state.currentEffect === 'direct';
+      this.audio.setFxBypass(bypass);
+      if (bypass) {
+        // ensure FX lock is false when bypassed? keep as-is but levels remain
+      }
+    }
+    if (changedProps.includes('fxLocked')) {
+      // Optionally handle UI lock state
+    }
+
+    if (changedProps.includes('playstyle')) {
+      if (state.playstyle === 'simple' && !this.heldChordType) {
+        this.playstyleForceSingle = true;
+        this.playstyleOverrideType = null;
+      }
+      if (state.isPlaying) {
+        this.playCurrentChord(this.getPlaybackOptions());
+      }
+    }
 
     // Power Handling
     if (changedProps.includes('powered')) {
@@ -220,28 +315,48 @@ export class PoorchidApp {
     if (changedProps.includes('bassEnabled') && !state.bassEnabled) {
       this.audio.stopBass();
     }
+    if (changedProps.includes('bassMode') && state.bassMode === 'direct') {
+      this.audio.stopBass();
+    }
 
     // Musical Updates (Re-trigger if playing)
-    const retriggerProps = ['type', 'extensions', 'voicingCenter', 'bassMode', 'bassVoicing', 'bassEnabled'];
+    const retriggerProps = ['type', 'extensions', 'voicingCenter', 'bassMode', 'bassVoicing', 'bassEnabled', 'keyAutoChords'];
     
     if (state.powered) {
       if (changedProps.includes('root')) {
-        this.playCurrentChord();
+        this.playCurrentChord(this.getPlaybackOptions());
       } else if (state.isPlaying && changedProps.some(p => retriggerProps.includes(p))) {
-        this.playCurrentChord();
+        this.playCurrentChord(this.getPlaybackOptions());
       }
     }
   }
 
-  playCurrentChord() {
+  playCurrentChord(options = {}) {
     const state = this.stateManager.state;
 
+    let root = state.root;
+    let chordType = options.overrideType || state.type;
+    let forceSingle = !!options.forceSingle;
+    // Strum mode should always build chords; ignore single-note forcing here
+    if (state.performMode === 'strum') {
+      forceSingle = false;
+    }
+
+    // Key mode auto-chord (diatonic)
+    if (state.keyEnabled && state.keyAutoChords) {
+      root = this.logic.quantizeRoot(root, state.keyRoot, state.keyScale);
+      chordType = this.logic.getDiatonicChordType(root, state.keyRoot, state.keyScale);
+      forceSingle = false;
+    }
+
     // 1. Get base notes
-    const baseNotes = this.logic.getNotes(
-      state.root, 
-      state.type, 
-      Array.from(state.extensions)
-    );
+    const baseNotes = forceSingle
+      ? [this.logic.getMidiRoot(root)]
+      : this.logic.getNotes(
+        root, 
+        chordType, 
+        Array.from(state.extensions)
+      );
 
     // 2. Apply voicing
     const voicedNotes = this.voicing.getVoicing(baseNotes, state.voicingCenter);
@@ -302,6 +417,10 @@ export class PoorchidApp {
     } else {
       // Bass enabled: behavior depends on mode
       switch (state.bassMode) {
+        case 'direct':
+          this.audio.playChord(voicedNotes);
+          this.audio.stopBass();
+          break;
         case 'solo':
           // Solo: Bass plays independently, no chords
           this.audio.playChord([]);
@@ -412,9 +531,29 @@ export class PoorchidApp {
     
     // Full keyboard range
     if (note > MIDI_NOTE_MAX) return;
-    
+
     const noteName = this.logic.getNoteName(note);
     if (!noteName) return;
+
+    const playstyle = this.stateManager.get('playstyle');
+    const keyChordActive = this.stateManager.get('keyEnabled') && this.stateManager.get('keyAutoChords');
+    const chordHeld = !!this.heldChordType;
+
+    let useChord = keyChordActive || (playstyle === 'simple' ? chordHeld : chordHeld);
+    let overrideType = chordHeld ? this.heldChordType : null;
+
+    // Free mode reverts when button released; advanced keeps chord once engaged via button
+    if (!useChord && playstyle === 'advanced' && this.playstyleOverrideType && this.stateManager.state.activeMidiNotes.size > 0) {
+      useChord = true;
+      overrideType = this.playstyleOverrideType;
+    }
+
+    this.playstyleForceSingle = !useChord;
+    this.playstyleOverrideType = useChord ? overrideType : null;
+
+    if (useChord && overrideType) {
+      this.stateManager.setChordType(overrideType);
+    }
 
     this.stateManager.state.activeMidiNotes.add(note);
     const rootChanged = this.stateManager.get('root') !== noteName;
@@ -462,6 +601,8 @@ export class PoorchidApp {
       this.patternPlayer.stop();
       this.strummer.release();
       this.stateManager.setIsPlaying(false);
+      this.playstyleForceSingle = false;
+      this.playstyleOverrideType = null;
       
       if (this.currentRecordedNotes) {
         for (const n of this.currentRecordedNotes) {

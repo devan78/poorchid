@@ -14,7 +14,7 @@ export class PoorchidState {
       looperState: 'idle', // idle, recording, playing, overdubbing
       isPlaying: false,
       bassEnabled: false, // Bass on/off toggle (click Bass dial)
-      bassMode: 'chords', // chords, unison, single, solo
+      bassMode: 'chords', // direct, chords, unison, single, solo
       bassVoicing: 0, // Octave offset: -2 to +2 (semitones -24 to +24)
       bassVolume: 60, // 0-99 independent volume
       volume: 70, // Master volume 0-99
@@ -22,15 +22,31 @@ export class PoorchidState {
       keyEnabled: false, // Key lock mode on/off
       keyRoot: 'C', // Current key root (C, C#, D, etc.)
       keyScale: 'major', // Scale type (major, minor, dorian, etc.)
+      keyAutoChords: true, // When key mode is on, auto-select diatonic chord types
       // Performance mode
       performMode: 'direct', // direct, arp, strum, pattern
       arpPattern: 'up', // up, down, updown, random
       arpDivision: '1/8', // Note division
       strumSpeed: 50, // 0-99
       rhythmPattern: 'straight', // Pattern mode: straight, offbeat, pulse, tresillo, clave, shuffle, waltz, funk
+      playstyle: 'advanced', // simple, advanced, free
       // BPM
       bpm: 120, // 20-300
       metronomeOn: false,
+      // FX System
+      currentEffect: 'direct', // Currently selected effect for editing (includes 'direct' for bypass)
+      fxLocked: false, // Lock FX settings when changing sounds
+      // Effect levels (0-99 each)
+      fxLevels: {
+        reverb: 0,
+        delay: 0,
+        chorus: 0,
+        phaser: 0,
+        flanger: 0,
+        drive: 0,
+        tremolo: 0,
+        ensemble: 0
+      },
       ...initialState
     };
     
@@ -143,7 +159,7 @@ export class PoorchidState {
   }
 
   setBassMode(mode) {
-    const validModes = ['chords', 'unison', 'single', 'solo'];
+    const validModes = ['direct', 'chords', 'unison', 'single', 'solo'];
     if (validModes.includes(mode) && this.state.bassMode !== mode) {
       this.state.bassMode = mode;
       this.notify(['bassMode']);
@@ -188,7 +204,7 @@ export class PoorchidState {
   }
 
   cycleBassMode() {
-    const modes = ['chords', 'unison', 'single', 'solo'];
+    const modes = ['direct', 'chords', 'unison', 'single', 'solo'];
     const currentIndex = modes.indexOf(this.state.bassMode);
     const nextIndex = (currentIndex + 1) % modes.length;
     this.setBassMode(modes[nextIndex]);
@@ -217,6 +233,17 @@ export class PoorchidState {
 
   toggleKey() {
     this.setKeyEnabled(!this.state.keyEnabled);
+  }
+
+  setKeyAutoChords(enabled) {
+    if (this.state.keyAutoChords !== enabled) {
+      this.state.keyAutoChords = enabled;
+      this.notify(['keyAutoChords']);
+    }
+  }
+
+  toggleKeyAutoChords() {
+    this.setKeyAutoChords(!this.state.keyAutoChords);
   }
 
   setKeyRoot(root) {
@@ -338,5 +365,70 @@ export class PoorchidState {
   toggleMetronome() {
     this.state.metronomeOn = !this.state.metronomeOn;
     this.notify(['metronomeOn']);
+  }
+
+  setPlaystyle(style) {
+    const valid = ['simple', 'advanced', 'free'];
+    if (valid.includes(style) && this.state.playstyle !== style) {
+      this.state.playstyle = style;
+      this.notify(['playstyle']);
+    }
+  }
+
+  cyclePlaystyle(direction = 1) {
+    const order = ['simple', 'advanced', 'free'];
+    const idx = order.indexOf(this.state.playstyle);
+    const next = (idx + direction + order.length) % order.length;
+    this.setPlaystyle(order[next]);
+    return this.state.playstyle;
+  }
+
+  // FX methods
+  static FX_TYPES = ['direct', 'reverb', 'delay', 'chorus', 'phaser', 'flanger', 'drive', 'tremolo', 'ensemble'];
+
+  setCurrentEffect(effect) {
+    if (PoorchidState.FX_TYPES.includes(effect) && this.state.currentEffect !== effect) {
+      this.state.currentEffect = effect;
+      this.notify(['currentEffect']);
+    }
+  }
+
+  cycleCurrentEffect(direction = 1) {
+    const effects = PoorchidState.FX_TYPES;
+    const currentIndex = effects.indexOf(this.state.currentEffect);
+    const nextIndex = (currentIndex + direction + effects.length) % effects.length;
+    this.setCurrentEffect(effects[nextIndex]);
+    return this.state.currentEffect;
+  }
+
+  setFxLevel(effect, level) {
+    if (!PoorchidState.FX_TYPES.includes(effect)) return;
+    const clamped = Math.max(0, Math.min(99, level));
+    if (this.state.fxLevels[effect] !== clamped) {
+      this.state.fxLevels[effect] = clamped;
+      this.notify(['fxLevels', effect]);
+    }
+  }
+
+  adjustFxLevel(effect, delta) {
+    const current = this.state.fxLevels[effect] || 0;
+    this.setFxLevel(effect, current + delta);
+  }
+
+  getFxLevel(effect) {
+    return this.state.fxLevels[effect] || 0;
+  }
+
+  toggleFxLock() {
+    this.state.fxLocked = !this.state.fxLocked;
+    this.notify(['fxLocked']);
+    return this.state.fxLocked;
+  }
+
+  setFxLocked(locked) {
+    if (this.state.fxLocked !== locked) {
+      this.state.fxLocked = locked;
+      this.notify(['fxLocked']);
+    }
   }
 }

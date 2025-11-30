@@ -1,14 +1,33 @@
 import { PATCHES } from './patch-manager.js';
 
+const ENCODER_TYPES = {
+  volume: { type: 'scoped', min: 0, max: 99 },
+  bass: { type: 'scoped', min: 0, max: 99 },
+  perform: { type: 'scoped', min: 0, max: 99 }, // value feeds performMode handlers
+  bpm: { type: 'scoped', min: 0, max: 99 }, // mapped to 20-300
+  fx: { type: 'scoped', min: 0, max: 99 },
+  sound: { type: 'infinite' },
+  key: { type: 'infinite' },
+  options: { type: 'infinite' },
+  loop: { type: 'infinite' } // placeholder for future loop actions
+};
+
 export class PoorchidUI {
   constructor(container, actions) {
     this.container = container;
     this.actions = actions;
     this.encoderRotations = {}; // Track rotation angles per encoder
+    this._bassVolumeFlashUntil = 0;
+    this._fxStateSnapshot = null;
+    this._currentBpmValue = 36; // syncs to state on update
+    this._currentPerformValue = 50;
+    this.encoderEngaged = new Map([['fx', false]]); // tracks which encoders are engaged/active
+    this.state = null;
     this.attachEvents();
   }
 
   mount(state) {
+    this.state = state;
     this.container.innerHTML = `
       <!-- ROW 1: Configuration & Display -->
       <div class="config-row">
@@ -50,23 +69,28 @@ export class PoorchidUI {
             <div class="oled-content">
               <div class="oled-patch-name">${this.getPatchDisplayName(state.currentPatch)}</div>
               <div class="oled-main-text">${state.root} ${state.type}</div>
-              <div class="oled-sub-text">${state.extensions.size > 0 ? Array.from(state.extensions).join(' ') : 'No extensions'}</div>
-            </div>
-            <div class="oled-info-row">
-              <span class="oled-key-mode ${state.keyEnabled ? 'active' : ''}">KEY: ${state.keyEnabled ? state.keyRoot + ' ' + state.keyScale.toUpperCase().slice(0, 3) : 'OFF'}</span>
-              <span class="oled-bass-mode ${state.bassEnabled ? 'active' : ''}">${state.bassEnabled ? state.bassMode.toUpperCase() : ''}</span>
-            </div>
-            <div class="oled-info-row">
-              <span class="oled-perform-mode ${state.performMode !== 'direct' ? 'active' : ''}">${this.getPerformModeDisplay(state)}</span>
-              <span class="oled-bpm">${state.bpm} BPM</span>
-            </div>
-            <div class="oled-status">
-              <span class="status-item ${state.powered ? 'active' : ''}">PWR</span>
-              <span class="status-item ${state.midiConnected ? 'active' : ''}">MIDI</span>
-              <span class="status-item ${state.looperState !== 'idle' ? 'active' : ''}">LOOP</span>
-            </div>
+            <div class="oled-sub-text">${state.extensions.size > 0 ? Array.from(state.extensions).join(' ') : 'No extensions'}</div>
+          </div>
+          <div class="oled-info-row">
+            <span class="oled-key-mode ${state.keyEnabled ? 'active' : ''}">${this.getKeyDisplay(state)}</span>
+            <span class="oled-bass-mode ${state.bassEnabled ? 'active' : ''}">${state.bassEnabled ? state.bassMode.toUpperCase() : ''}</span>
+          </div>
+          <div class="oled-info-row">
+            <span class="oled-perform-mode ${state.performMode !== 'direct' ? 'active' : ''}">${this.getPerformModeDisplay(state)}</span>
+            <span class="oled-bpm">${state.bpm} BPM</span>
+          </div>
+          <div class="oled-info-row">
+            <span class="oled-fx ${state.currentEffect !== 'direct' ? 'active' : ''}">${this.getFxDisplay(state)}</span>
+            <span class="oled-fx-level">${state.currentEffect === 'direct' ? '' : this.getFxLevel(state)}</span>
+          </div>
+          <div class="oled-status">
+            <span class="status-item ${state.powered ? 'active' : ''}">PWR</span>
+            <span class="status-item ${state.midiConnected ? 'active' : ''}">MIDI</span>
+            <span class="status-item ${state.looperState !== 'idle' ? 'active' : ''}">LOOP</span>
+            <span class="status-item">STYLE ${state.playstyle.toUpperCase()}</span>
           </div>
         </div>
+      </div>
 
         <!-- Right Encoders -->
         <div class="encoder-group right-encoders">
@@ -177,7 +201,30 @@ export class PoorchidUI {
     return state.performMode.toUpperCase();
   }
 
+  getKeyDisplay(state) {
+    if (!state.keyEnabled) return 'KEY: OFF';
+    const scale = state.keyScale.toUpperCase().slice(0, 3);
+    const mode = state.keyAutoChords ? 'AUTO' : 'MAN';
+    return `KEY: ${state.keyRoot} ${scale} ${mode}`;
+  }
+
+  getFxDisplay(state) {
+    const effect = state.currentEffect || 'reverb';
+    const fxName = effect.toUpperCase();
+    if (effect === 'direct') return 'FX DIRECT';
+    return `FX ${fxName}`;
+  }
+
+  getFxLevel(state) {
+    const effect = state.currentEffect || 'reverb';
+    if (effect === 'direct') return '';
+    const level = (state.fxLevels && state.fxLevels[effect]) ?? 0;
+    const lock = state.fxLocked ? ' LOCK' : '';
+    return `${level}${lock}`;
+  }
+
   update(state) {
+    this.state = state;
     // OLED Display updates
     const oledPatch = this.container.querySelector('.oled-patch-name');
     if (oledPatch) {
@@ -197,7 +244,11 @@ export class PoorchidUI {
     // OLED Volume display (top right)
     const oledVolume = this.container.querySelector('.oled-volume');
     if (oledVolume) {
-      oledVolume.textContent = `VOL ${state.volume}`;
+      if (Date.now() < this._bassVolumeFlashUntil) {
+        oledVolume.textContent = `BASS ${state.bassVolume}`;
+      } else {
+        oledVolume.textContent = `VOL ${state.volume}`;
+      }
       oledVolume.dataset.volume = state.volume;
     }
 
@@ -214,20 +265,34 @@ export class PoorchidUI {
 
     const loopStatus = this.container.querySelector('.status-item:nth-child(3)');
     if (loopStatus) {
-      loopStatus.classList.toggle('active', state.looperState !== 'stopped');
+      loopStatus.classList.toggle('active', state.looperState !== 'idle');
+    }
+
+    const fxDisplay = this.container.querySelector('.oled-fx');
+    if (fxDisplay) {
+      fxDisplay.textContent = this.getFxDisplay(state);
+      fxDisplay.classList.toggle('active', state.currentEffect !== 'direct');
+    }
+
+    const fxLevel = this.container.querySelector('.oled-fx-level');
+    if (fxLevel) {
+      fxLevel.textContent = state.currentEffect === 'direct' ? '' : this.getFxLevel(state);
     }
 
     // Bass mode display on OLED
     const bassModeDisplay = this.container.querySelector('.oled-bass-mode');
     if (bassModeDisplay) {
-      bassModeDisplay.textContent = state.bassEnabled ? state.bassMode.toUpperCase() : '';
-      bassModeDisplay.classList.toggle('active', state.bassEnabled);
+      const text = state.bassEnabled ? `BASS: ${state.bassMode.toUpperCase()}` : '';
+      bassModeDisplay.textContent = text;
+      const isDirect = state.bassMode === 'direct';
+      bassModeDisplay.classList.toggle('active', state.bassEnabled && !isDirect);
+      bassModeDisplay.classList.toggle('inactive', isDirect);
     }
 
     // Key mode display on OLED
     const keyModeDisplay = this.container.querySelector('.oled-key-mode');
     if (keyModeDisplay) {
-      keyModeDisplay.textContent = `KEY: ${state.keyEnabled ? state.keyRoot + ' ' + state.keyScale.toUpperCase().slice(0, 3) : 'OFF'}`;
+      keyModeDisplay.textContent = this.getKeyDisplay(state);
       keyModeDisplay.classList.toggle('active', state.keyEnabled);
     }
 
@@ -235,6 +300,11 @@ export class PoorchidUI {
     const keyEncoder = this.container.querySelector('.encoder[data-encoder="key"]');
     if (keyEncoder) {
       keyEncoder.classList.toggle('active', state.keyEnabled);
+    }
+
+    const playstyleStatus = this.container.querySelector('.oled-status .status-item:nth-child(4)');
+    if (playstyleStatus) {
+      playstyleStatus.textContent = `STYLE ${state.playstyle.toUpperCase()}`;
     }
 
     // Perform mode display on OLED
@@ -253,16 +323,48 @@ export class PoorchidUI {
     // Perform encoder visual state
     const performEncoder = this.container.querySelector('.encoder[data-encoder="perform"]');
     if (performEncoder) {
-      performEncoder.classList.toggle('active', state.performMode !== 'direct');
+      // Disengage when in DIRECT
+      const engaged = state.performMode !== 'direct';
+      this.encoderEngaged.set('perform', engaged);
+      performEncoder.classList.toggle('active', engaged);
+      const knob = performEncoder.querySelector('.encoder-knob');
+      if (knob) {
+        const rotation = engaged ? (this._currentPerformValue / 99) * 270 - 135 : 0;
+        knob.style.transform = `rotate(${rotation}deg)`;
+      }
     }
+
+    const fxEncoder = this.container.querySelector('.encoder[data-encoder="fx"]');
+    if (fxEncoder) {
+      const engaged = this.encoderEngaged.get('fx') === true && state.currentEffect !== 'direct';
+      this.encoderEngaged.set('fx', engaged);
+      fxEncoder.classList.toggle('active', engaged);
+      const knob = fxEncoder.querySelector('.encoder-knob');
+      if (knob) {
+        this._currentFxValue = state.fxLevels[state.currentEffect] ?? 0;
+        const rotation = engaged ? (this._currentFxValue / 99) * 270 - 135 : 0;
+        knob.style.transform = `rotate(${rotation}deg)`;
+      }
+    }
+
+    this._currentBpmValue = Math.round(((state.bpm - 20) / 280) * 99);
+    this._currentPerformValue = this._currentPerformValue ?? 50;
+    this._fxStateSnapshot = {
+      currentEffect: state.currentEffect,
+      fxLevels: { ...state.fxLevels },
+      fxLocked: state.fxLocked
+    };
+    this._lastFxEffect = state.currentEffect;
 
     // Bass encoder visual state (finite rotation for volume: 0 = -135°, 99 = +135°)
     const bassEncoder = this.container.querySelector('.encoder[data-encoder="bass"]');
     if (bassEncoder) {
-      bassEncoder.classList.toggle('active', state.bassEnabled);
+      const engaged = state.bassEnabled && state.bassMode !== 'direct';
+      this.encoderEngaged.set('bass', engaged);
+      bassEncoder.classList.toggle('active', engaged);
       const knob = bassEncoder.querySelector('.encoder-knob');
       if (knob) {
-        const rotation = (state.bassVolume / 99) * 270 - 135;
+        const rotation = engaged ? (state.bassVolume / 99) * 270 - 135 : 0;
         knob.style.transform = `rotate(${rotation}deg)`;
       }
       // Keep internal tracking in sync
@@ -274,7 +376,8 @@ export class PoorchidUI {
     if (volumeEncoder) {
       const knob = volumeEncoder.querySelector('.encoder-knob');
       if (knob) {
-        const rotation = (state.volume / 99) * 270 - 135;
+        const engaged = this.encoderEngaged.get('volume') === true;
+        const rotation = engaged ? (state.volume / 99) * 270 - 135 : 0;
         knob.style.transform = `rotate(${rotation}deg)`;
       }
       // Keep internal tracking in sync
@@ -403,6 +506,24 @@ export class PoorchidUI {
     // Track long-press for BPM encoder (tap tempo)
     let bpmLongPressTimer = null;
     let bpmWasLongPress = false;
+    let volumeHeld = false;
+
+    // Chord type press/release handling (for playstyle behaviors)
+    this.container.addEventListener('pointerdown', (e) => {
+      const typeBtn = e.target.closest('[data-type]');
+      if (typeBtn && (typeBtn.classList.contains('perf-btn') || typeBtn.closest('#type-controls'))) {
+        e.preventDefault();
+        this.actions.pressChordType(typeBtn.dataset.type);
+      }
+    });
+
+    this.container.addEventListener('pointerup', (e) => {
+      const typeBtn = e.target.closest('[data-type]');
+      if (typeBtn && (typeBtn.classList.contains('perf-btn') || typeBtn.closest('#type-controls'))) {
+        e.preventDefault();
+        this.actions.releaseChordType(typeBtn.dataset.type);
+      }
+    });
 
     this.container.addEventListener('mousedown', (e) => {
       const bassEncoder = e.target.closest('.encoder[data-encoder="bass"]');
@@ -459,6 +580,7 @@ export class PoorchidUI {
         clearTimeout(bpmLongPressTimer);
         bpmLongPressTimer = null;
       }
+      volumeHeld = false;
     });
 
     this.container.addEventListener('mouseleave', (e) => {
@@ -483,8 +605,12 @@ export class PoorchidUI {
     this.container.addEventListener('click', (e) => {
       const target = e.target;
 
-      // Key encoder click (short press = toggle key lock on/off)
+      // Key encoder click (short press = toggle key lock on/off, shift+click toggles auto-chords)
       const keyEncoder = e.target.closest('.encoder[data-encoder="key"]');
+      if (keyEncoder && e.shiftKey) {
+        this.actions.toggleKeyAutoChords();
+        return;
+      }
       if (keyEncoder && !keyWasLongPress) {
         this.actions.toggleKey();
         return;
@@ -493,7 +619,12 @@ export class PoorchidUI {
       // Bass encoder click (short press = toggle on/off)
       const bassEncoder = e.target.closest('.encoder[data-encoder="bass"]');
       if (bassEncoder && !bassWasLongPress) {
-        this.actions.toggleBass();
+        if (!this.state?.bassEnabled) {
+          this.actions.toggleBass();
+        } else {
+          this.actions.cycleBassMode();
+        }
+        this.encoderEngaged.set('bass', true);
         return;
       }
 
@@ -501,6 +632,7 @@ export class PoorchidUI {
       const performEncoder = e.target.closest('.encoder[data-encoder="perform"]');
       if (performEncoder && !performWasLongPress) {
         this.actions.cyclePerformMode();
+        this.encoderEngaged.set('perform', true);
         return;
       }
 
@@ -508,24 +640,34 @@ export class PoorchidUI {
       const bpmEncoder = e.target.closest('.encoder[data-encoder="bpm"]');
       if (bpmEncoder && !bpmWasLongPress) {
         this.actions.tapTempo();
+        this.encoderEngaged.set('bpm', true);
+        return;
+      }
+
+      const fxEncoder = e.target.closest('.encoder[data-encoder="fx"]');
+      if (fxEncoder) {
+        // Engage on click; cycling handled by actions
+        this.encoderEngaged.set('fx', true);
+        if (this._currentFxValue === undefined) this._currentFxValue = 0;
+        if (e.shiftKey) {
+          this.actions.toggleFxLock();
+        } else {
+          this.actions.cycleFxType();
+        }
+        return;
+      }
+
+      const optionsEncoder = e.target.closest('.encoder[data-encoder="options"]');
+      if (optionsEncoder) {
+        this.actions.cyclePlaystyle();
         return;
       }
 
       if (target.id === 'power-btn') this.actions.togglePower();
-      
-      if (target.closest('#type-controls button')) {
-        const type = target.closest('button').dataset.type;
-        this.actions.setChordType(type);
-      }
 
       if (target.closest('#ext-controls button')) {
         const ext = target.closest('button').dataset.ext;
         this.actions.toggleExtension(ext);
-      }
-
-      // Performance buttons - chord type
-      if (target.classList.contains('perf-btn') && target.dataset.type) {
-        this.actions.setChordType(target.dataset.type);
       }
 
       // Performance buttons - extensions
@@ -557,34 +699,60 @@ export class PoorchidUI {
     
     let dragState = null; // { encoder, startY, startValue }
     
-    // Helper to update encoder based on delta
-    const updateEncoder = (encoderName, delta, encoder) => {
-      // Volume encoder: finite rotation with hard stops at 0 and 99
-      if (encoderName === 'volume') {
-        if (this._currentVolume === undefined) this._currentVolume = 70;
-        const newVolume = Math.max(0, Math.min(99, this._currentVolume + delta));
-        
-        if (newVolume !== this._currentVolume) {
-          this._currentVolume = newVolume;
-          this.actions.setVolume(this._currentVolume);
-          
-          // Map volume 0-99 to rotation -135 to +135 degrees (270° sweep)
-          const rotation = (this._currentVolume / 99) * 270 - 135;
-          const knob = encoder.querySelector('.encoder-knob');
-          if (knob) {
-            knob.style.transform = `rotate(${rotation}deg)`;
+      // Helper to update encoder based on delta
+      const updateEncoder = (encoderName, delta, encoder, { fine = false } = {}) => {
+        const step = fine ? 1 : 3;
+        const clamp = (val, min, max) => Math.max(min, Math.min(max, val));
+        this.encoderEngaged.set(encoderName, true);
+
+        // Volume encoder: finite rotation with hard stops at 0 and 99
+        if (encoderName === 'volume') {
+          const adjustingBass = volumeHeld;
+          if (adjustingBass) {
+            if (this._currentBassVolume === undefined) this._currentBassVolume = 60;
+            const newBass = clamp(this._currentBassVolume + delta * step, 0, 99);
+            if (newBass !== this._currentBassVolume) {
+              this._currentBassVolume = newBass;
+              this._bassVolumeFlashUntil = Date.now() + 1200;
+              this.actions.setBassVolume(this._currentBassVolume);
+              const rotation = (this._currentBassVolume / 99) * 270 - 135;
+              const knob = encoder.querySelector('.encoder-knob');
+              if (knob) {
+                knob.style.transform = `rotate(${rotation}deg)`;
+              }
+              const oledVolume = this.container.querySelector('.oled-volume');
+              if (oledVolume) {
+                oledVolume.textContent = `BASS ${this._currentBassVolume}`;
+              }
+            }
+            return;
+          } else {
+            if (this._currentVolume === undefined) this._currentVolume = 70;
+            const newVolume = clamp(this._currentVolume + delta * step, 0, 99);
+            
+            if (newVolume !== this._currentVolume) {
+              this._currentVolume = newVolume;
+              this.actions.setVolume(this._currentVolume);
+              
+              // Map volume 0-99 to rotation -135 to +135 degrees (270° sweep)
+              const rotation = (this._currentVolume / 99) * 270 - 135;
+              const knob = encoder.querySelector('.encoder-knob');
+              if (knob) {
+                knob.style.transform = `rotate(${rotation}deg)`;
+              }
+            }
+            return;
           }
         }
-        return;
-      }
       
-      // Bass encoder: finite rotation for bass volume (0-99)
-      if (encoderName === 'bass') {
-        if (this._currentBassVolume === undefined) this._currentBassVolume = 60;
-        const newVolume = Math.max(0, Math.min(99, this._currentBassVolume + delta));
+        // Bass encoder: finite rotation for bass volume (0-99)
+        if (encoderName === 'bass') {
+          if (this._currentBassVolume === undefined) this._currentBassVolume = 60;
+        const newVolume = clamp(this._currentBassVolume + delta * step, 0, 99);
         
         if (newVolume !== this._currentBassVolume) {
           this._currentBassVolume = newVolume;
+          this._bassVolumeFlashUntil = Date.now() + 1200;
           this.actions.setBassVolume(this._currentBassVolume);
           
           // Map volume 0-99 to rotation -135 to +135 degrees (270° sweep)
@@ -593,14 +761,47 @@ export class PoorchidUI {
           if (knob) {
             knob.style.transform = `rotate(${rotation}deg)`;
           }
+          const oledVolume = this.container.querySelector('.oled-volume');
+          if (oledVolume) {
+            oledVolume.textContent = `BASS ${this._currentBassVolume}`;
+          }
         }
         return;
       }
+
+        // FX encoder: finite rotation controlling current effect level (0-99)
+        if (encoderName === 'fx') {
+          if (this._currentFxValue === undefined) this._currentFxValue = 0;
+          const newValue = clamp(this._currentFxValue + delta * step, 0, 99);
+          if (newValue !== this._currentFxValue) {
+            this._currentFxValue = newValue;
+            const effect = (this._fxStateSnapshot && this._fxStateSnapshot.currentEffect) || this._lastFxEffect || 'reverb';
+            if (effect !== 'direct') {
+              this.actions.setFxLevel(effect, this._currentFxValue);
+            }
+            const knob = encoder.querySelector('.encoder-knob');
+            if (knob) {
+              const rotation = (this._currentFxValue / 99) * 270 - 135;
+              knob.style.transform = `rotate(${rotation}deg)`;
+            }
+            const fxDisplay = this.container.querySelector('.oled-fx');
+            if (fxDisplay) {
+              const snapshot = this._fxStateSnapshot || {};
+              const levels = { ...(snapshot.fxLevels || {}), [effect]: this._currentFxValue };
+              fxDisplay.textContent = this.getFxDisplay({
+                currentEffect: effect,
+                fxLevels: levels,
+                fxLocked: snapshot.fxLocked || false
+              });
+            }
+          }
+          return;
+        }
       
-      // Perform encoder: finite rotation (0-99) for division/speed
-      if (encoderName === 'perform') {
-        if (this._currentPerformValue === undefined) this._currentPerformValue = 50;
-        const newValue = Math.max(0, Math.min(99, this._currentPerformValue + delta));
+        // Perform encoder: finite rotation (0-99) for division/speed
+        if (encoderName === 'perform') {
+          if (this._currentPerformValue === undefined) this._currentPerformValue = 50;
+        const newValue = clamp(this._currentPerformValue + delta * step, 0, 99);
         
         if (newValue !== this._currentPerformValue) {
           this._currentPerformValue = newValue;
@@ -616,10 +817,10 @@ export class PoorchidUI {
         return;
       }
       
-      // BPM encoder: finite rotation (20-300 BPM mapped to 0-99 arc)
-      if (encoderName === 'bpm') {
-        if (this._currentBpmValue === undefined) this._currentBpmValue = 36; // 120 BPM default
-        const newValue = Math.max(0, Math.min(99, this._currentBpmValue + delta));
+        // BPM encoder: finite rotation (20-300 BPM mapped to 0-99 arc)
+        if (encoderName === 'bpm') {
+          if (this._currentBpmValue === undefined) this._currentBpmValue = 36; // 120 BPM default
+        const newValue = clamp(this._currentBpmValue + delta * step, 0, 99);
         
         if (newValue !== this._currentBpmValue) {
           this._currentBpmValue = newValue;
@@ -637,11 +838,11 @@ export class PoorchidUI {
         return;
       }
       
-      // Other encoders: infinite rotation
-      if (!this.encoderRotations[encoderName]) {
-        this.encoderRotations[encoderName] = 0;
-      }
-      this.encoderRotations[encoderName] += delta * 3; // 3 degrees per unit
+        // Other encoders: infinite rotation
+        if (!this.encoderRotations[encoderName]) {
+          this.encoderRotations[encoderName] = 0;
+        }
+        this.encoderRotations[encoderName] += delta * 3; // 3 degrees per unit
       
       const knob = encoder.querySelector('.encoder-knob');
       if (knob) {
@@ -649,16 +850,19 @@ export class PoorchidUI {
       }
       
       // Trigger actions for infinite encoders (on significant movement)
-      if (Math.abs(delta) >= 1) {
-        const direction = delta > 0 ? 1 : -1; // drag up = increase
-        if (encoderName === 'sound') {
-          this.actions.cyclePatch(-direction); // Inverted for patch cycling
+        if (Math.abs(delta) >= 1) {
+          const direction = delta > 0 ? 1 : -1; // drag up = increase
+          if (encoderName === 'sound') {
+            this.actions.cyclePatch(-direction); // Inverted for patch cycling
+          }
+          if (encoderName === 'key') {
+            this.actions.cycleKeyRoot(direction); // Rotate to change key
+          }
+          if (encoderName === 'options') {
+            this.actions.cyclePlaystyle(direction);
+          }
         }
-        if (encoderName === 'key') {
-          this.actions.cycleKeyRoot(direction); // Rotate to change key
-        }
-      }
-    };
+      };
     
     // Mouse down - start drag
     this.container.addEventListener('mousedown', (e) => {
@@ -669,12 +873,20 @@ export class PoorchidUI {
         e.preventDefault();
         encoder.classList.add('dragging');
         document.body.style.cursor = 'ns-resize';
+        if (encoderName === 'volume') {
+          volumeHeld = true;
+        }
+        if (encoderName === 'fx') {
+          // Ensure we start from the displayed value
+          if (this._currentFxValue === undefined) this._currentFxValue = 0;
+        }
         
         dragState = {
           encoder,
           encoderName,
           startY: e.clientY,
-          lastY: e.clientY
+          lastY: e.clientY,
+          fine: e.shiftKey
         };
       }
     });
@@ -683,15 +895,15 @@ export class PoorchidUI {
     document.addEventListener('mousemove', (e) => {
       if (!dragState) return;
       
-      const deltaY = dragState.lastY - e.clientY; // Inverted: up = positive
-      const sensitivity = 2; // pixels per unit
-      const delta = deltaY / sensitivity;
-      
-      if (Math.abs(delta) >= 1) {
-        updateEncoder(dragState.encoderName, delta, dragState.encoder);
+        const deltaY = dragState.lastY - e.clientY; // Inverted: up = positive
+        const sensitivity = 2; // pixels per unit
+        const delta = deltaY / sensitivity;
+        
+        if (Math.abs(delta) >= 1) {
+        updateEncoder(dragState.encoderName, delta, dragState.encoder, { fine: dragState.fine });
         dragState.lastY = e.clientY;
-      }
-    });
+        }
+      });
     
     // Mouse up - end drag
     document.addEventListener('mouseup', () => {
@@ -700,6 +912,7 @@ export class PoorchidUI {
         document.body.style.cursor = '';
         dragState = null;
       }
+      volumeHeld = false;
     });
     
     // Mouse wheel - also works
@@ -709,7 +922,13 @@ export class PoorchidUI {
         e.preventDefault();
         const encoderName = encoder.dataset.encoder;
         const delta = e.deltaY > 0 ? -5 : 5; // Scroll up = increase
-        updateEncoder(encoderName, delta, encoder);
+        const previousHold = volumeHeld;
+        if (encoderName === 'volume') {
+          volumeHeld = e.shiftKey || previousHold;
+        }
+        updateEncoder(encoderName, delta, encoder, { fine: e.shiftKey });
+        this.encoderEngaged.set(encoderName, true);
+        volumeHeld = previousHold;
       }
     }, { passive: false });
   }

@@ -139,4 +139,33 @@ export class ChordLogic {
     const quantized = this.quantizeToScale(midiNote, keyRoot, scaleType);
     return this.getNoteName(quantized);
   }
+
+  /**
+   * Get diatonic chord quality for a note within a key/scale.
+   * Returns one of the core chord types understood by the app.
+   */
+  getDiatonicChordType(rootName, keyRoot, scaleType = 'major') {
+    const scale = this.scaleIntervals[scaleType] || this.scaleIntervals['major'];
+    const rootSemitone = this.noteMap[rootName];
+    const keySemitone = this.noteMap[keyRoot] || 0;
+    if (rootSemitone === undefined) return 'major';
+
+    // Determine scale degree index
+    const offset = (rootSemitone - keySemitone + 12) % 12;
+    const degreeIndex = scale.indexOf(offset);
+    if (degreeIndex === -1) return 'major';
+
+    // Ionian triad qualities rotated for modal scales
+    const ionianQualities = ['major', 'minor', 'minor', 'major', 'major', 'minor', 'diminished'];
+    const modeRotation = ['major', 'dorian', 'phrygian', 'lydian', 'mixolydian', 'minor', 'locrian'];
+    const rotationIndex = modeRotation.indexOf(scaleType);
+    const shift = rotationIndex === -1 ? 0 : rotationIndex;
+
+    const rotated = [
+      ...ionianQualities.slice(shift),
+      ...ionianQualities.slice(0, shift)
+    ];
+
+    return rotated[degreeIndex] || 'major';
+  }
 }
