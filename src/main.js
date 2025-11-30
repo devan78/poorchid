@@ -3,7 +3,7 @@ import { ChordLogic } from './chord-logic';
 import { VoicingEngine } from './voicing-engine';
 import { MidiHandler } from './midi-handler';
 import { Looper } from './looper';
-import { Arpeggiator, Strummer } from './arpeggiator';
+import { Arpeggiator, Strummer, PatternPlayer } from './arpeggiator';
 import { PoorchidState } from './state';
 import { PoorchidUI } from './ui';
 import { 
@@ -42,6 +42,12 @@ export class PoorchidApp {
     this.arpeggiator = new Arpeggiator(this.audio.ctx, {
       onNoteOn: (note, vel) => this.audio.playArpNote(note, vel),
       onNoteOff: (note) => {} // Arp voice handles its own note-off via legato
+    });
+    
+    // Pattern player uses same monophonic approach as arp
+    this.patternPlayer = new PatternPlayer(this.audio.ctx, {
+      onNoteOn: (note, vel) => this.audio.playArpNote(note, vel),
+      onNoteOff: (note) => {} // Pattern voice handles its own note-off via legato
     });
     
     // Strummer uses regular voices but tracks them
@@ -167,6 +173,7 @@ export class PoorchidApp {
     // Arpeggiator parameter updates
     if (changedProps.includes('bpm')) {
       this.arpeggiator.setBpm(state.bpm);
+      this.patternPlayer.setBpm(state.bpm);
     }
     if (changedProps.includes('arpPattern')) {
       this.arpeggiator.setPattern(state.arpPattern);
@@ -177,12 +184,19 @@ export class PoorchidApp {
     if (changedProps.includes('strumSpeed')) {
       this.strummer.setSpeed(state.strumSpeed);
     }
+    if (changedProps.includes('rhythmPattern')) {
+      this.patternPlayer.setPattern(state.rhythmPattern);
+    }
     
     // Performance mode change
     if (changedProps.includes('performMode')) {
       // Stop arpeggiator when switching modes
       if (state.performMode !== 'arp') {
         this.arpeggiator.stop();
+      }
+      // Stop pattern player when switching modes
+      if (state.performMode !== 'pattern') {
+        this.patternPlayer.stop();
       }
       // Release strummer when switching modes
       if (state.performMode !== 'strum') {
@@ -258,11 +272,26 @@ export class PoorchidApp {
       }
       this.stateManager.setIsPlaying(true);
       return;
+    } else if (state.performMode === 'pattern') {
+      // Pattern mode: play notes in rhythmic patterns synced to BPM
+      this.patternPlayer.updateNotes(voicedNotes);
+      if (!this.patternPlayer.isRunning) {
+        this.patternPlayer.start(voicedNotes);
+      }
+      // Bass still plays normally in pattern mode
+      if (state.bassEnabled) {
+        this.audio.playBass(bassNote);
+      }
+      this.stateManager.setIsPlaying(true);
+      return;
     }
     
-    // Direct mode: play immediately (stop arp if running)
+    // Direct mode: play immediately (stop arp/pattern if running)
     if (this.arpeggiator.isRunning) {
       this.arpeggiator.stop();
+    }
+    if (this.patternPlayer.isRunning) {
+      this.patternPlayer.stop();
     }
 
     // 5. Play based on bass mode
@@ -430,6 +459,7 @@ export class PoorchidApp {
     if (this.stateManager.state.activeMidiNotes.size === 0) {
       this.audio.stopAll();
       this.arpeggiator.stop();
+      this.patternPlayer.stop();
       this.strummer.release();
       this.stateManager.setIsPlaying(false);
       
@@ -522,6 +552,7 @@ export class PoorchidApp {
    * Set performance parameter value (0-99)
    * - Arp mode: maps to note divisions (9 values)
    * - Strum mode: direct strum speed
+   * - Pattern mode: maps to rhythm patterns (8 values)
    */
   setPerformValue(value) {
     const mode = this.stateManager.get('performMode');
@@ -534,6 +565,11 @@ export class PoorchidApp {
     } else if (mode === 'strum') {
       this.stateManager.setStrumSpeed(value);
       this.strummer.setSpeed(value);
+    } else if (mode === 'pattern') {
+      // Map 0-99 to 8 rhythm patterns
+      const patterns = ['straight', 'offbeat', 'pulse', 'tresillo', 'clave', 'shuffle', 'waltz', 'funk'];
+      const index = Math.min(7, Math.floor(value / 12.5)); // 0-12=0, 13-25=1, etc.
+      this.stateManager.setRhythmPattern(patterns[index]);
     }
   }
 

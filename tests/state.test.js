@@ -298,4 +298,49 @@ describe('PoorchidState', () => {
       );
     });
   });
+
+  describe('Rhythm Pattern', () => {
+    it('should have default rhythm pattern of straight', () => {
+      expect(state.get('rhythmPattern')).toBe('straight');
+    });
+
+    it('should set valid rhythm patterns', () => {
+      state.setRhythmPattern('tresillo');
+      expect(state.get('rhythmPattern')).toBe('tresillo');
+      
+      state.setRhythmPattern('clave');
+      expect(state.get('rhythmPattern')).toBe('clave');
+    });
+
+    it('should ignore invalid rhythm patterns', () => {
+      state.setRhythmPattern('invalid');
+      expect(state.get('rhythmPattern')).toBe('straight');
+    });
+
+    it('should cycle through rhythm patterns', () => {
+      expect(state.get('rhythmPattern')).toBe('straight');
+      
+      state.cycleRhythmPattern(1);
+      expect(state.get('rhythmPattern')).toBe('offbeat');
+      
+      state.cycleRhythmPattern(-1);
+      expect(state.get('rhythmPattern')).toBe('straight');
+    });
+
+    it('should wrap around when cycling patterns', () => {
+      state.setRhythmPattern('funk'); // Last pattern
+      state.cycleRhythmPattern(1);
+      expect(state.get('rhythmPattern')).toBe('straight');
+    });
+
+    it('should notify listeners on rhythm pattern change', () => {
+      listener.mockClear();
+      
+      state.setRhythmPattern('shuffle');
+      expect(listener).toHaveBeenCalledWith(
+        expect.any(Object),
+        ['rhythmPattern']
+      );
+    });
+  });
 });

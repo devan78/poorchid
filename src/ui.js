@@ -162,7 +162,17 @@ export class PoorchidUI {
     } else if (state.performMode === 'strum') {
       return `STRUM ${state.strumSpeed}`;
     } else if (state.performMode === 'pattern') {
-      return 'PATTERN';
+      const patternNames = {
+        'straight': 'STRAIGHT',
+        'offbeat': 'OFFBEAT', 
+        'pulse': 'PULSE',
+        'tresillo': 'TRESILLO',
+        'clave': 'CLAVE',
+        'shuffle': 'SHUFFLE',
+        'waltz': 'WALTZ',
+        'funk': 'FUNK'
+      };
+      return `PATTERN ${patternNames[state.rhythmPattern] || state.rhythmPattern.toUpperCase()}`;
     }
     return state.performMode.toUpperCase();
   }

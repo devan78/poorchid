@@ -27,6 +27,7 @@ export class PoorchidState {
       arpPattern: 'up', // up, down, updown, random
       arpDivision: '1/8', // Note division
       strumSpeed: 50, // 0-99
+      rhythmPattern: 'straight', // Pattern mode: straight, offbeat, pulse, tresillo, clave, shuffle, waltz, funk
       // BPM
       bpm: 120, // 20-300
       metronomeOn: false,
@@ -303,6 +304,22 @@ export class PoorchidState {
       this.state.strumSpeed = clamped;
       this.notify(['strumSpeed']);
     }
+  }
+
+  setRhythmPattern(pattern) {
+    const validPatterns = ['straight', 'offbeat', 'pulse', 'tresillo', 'clave', 'shuffle', 'waltz', 'funk'];
+    if (validPatterns.includes(pattern) && this.state.rhythmPattern !== pattern) {
+      this.state.rhythmPattern = pattern;
+      this.notify(['rhythmPattern']);
+    }
+  }
+
+  cycleRhythmPattern(direction = 1) {
+    const patterns = ['straight', 'offbeat', 'pulse', 'tresillo', 'clave', 'shuffle', 'waltz', 'funk'];
+    const currentIndex = patterns.indexOf(this.state.rhythmPattern);
+    const nextIndex = (currentIndex + direction + patterns.length) % patterns.length;
+    this.setRhythmPattern(patterns[nextIndex]);
+    return this.state.rhythmPattern;
   }
 
   // BPM methods

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { Arpeggiator, Strummer } from '../src/arpeggiator';
+import { Arpeggiator, Strummer, PatternPlayer } from '../src/arpeggiator';
 
 describe('Arpeggiator', () => {
   let arp;
@@ -203,6 +203,140 @@ describe('Strummer', () => {
       
       expect(onNoteOff).toHaveBeenCalledTimes(3);
       expect(strummer.activeNotes.size).toBe(0);
+    });
+  });
+});
+
+describe('PatternPlayer', () => {
+  let pattern;
+  let mockCtx;
+  let onNoteOn;
+  let onNoteOff;
+
+  beforeEach(() => {
+    mockCtx = {
+      currentTime: 0
+    };
+    onNoteOn = vi.fn();
+    onNoteOff = vi.fn();
+    pattern = new PatternPlayer(mockCtx, { onNoteOn, onNoteOff });
+  });
+
+  afterEach(() => {
+    pattern.stop();
+  });
+
+  describe('BPM', () => {
+    it('should have default BPM of 120', () => {
+      expect(pattern.bpm).toBe(120);
+    });
+
+    it('should set BPM within valid range', () => {
+      pattern.setBpm(140);
+      expect(pattern.bpm).toBe(140);
+    });
+
+    it('should clamp BPM to minimum 20', () => {
+      pattern.setBpm(10);
+      expect(pattern.bpm).toBe(20);
+    });
+
+    it('should clamp BPM to maximum 300', () => {
+      pattern.setBpm(400);
+      expect(pattern.bpm).toBe(300);
+    });
+  });
+
+  describe('Patterns', () => {
+    it('should have default pattern of straight', () => {
+      expect(pattern.currentPatternName).toBe('straight');
+    });
+
+    it('should have 8 predefined patterns', () => {
+      expect(pattern.patternOrder.length).toBe(8);
+      expect(pattern.patternOrder).toContain('tresillo');
+      expect(pattern.patternOrder).toContain('clave');
+    });
+
+    it('should set valid patterns', () => {
+      pattern.setPattern('tresillo');
+      expect(pattern.currentPatternName).toBe('tresillo');
+    });
+
+    it('should ignore invalid patterns', () => {
+      pattern.setPattern('invalid');
+      expect(pattern.currentPatternName).toBe('straight');
+    });
+
+    it('should cycle through patterns', () => {
+      expect(pattern.currentPatternName).toBe('straight');
+      pattern.cyclePattern(1);
+      expect(pattern.currentPatternName).toBe('offbeat');
+      pattern.cyclePattern(-1);
+      expect(pattern.currentPatternName).toBe('straight');
+    });
+
+    it('should wrap around when cycling', () => {
+      pattern.setPattern('funk'); // Last pattern
+      pattern.cyclePattern(1);
+      expect(pattern.currentPatternName).toBe('straight'); // Wraps to first
+    });
+  });
+
+  describe('Notes', () => {
+    it('should set and sort notes', () => {
+      pattern.setNotes([67, 60, 64]);
+      expect(pattern.currentNotes).toEqual([60, 64, 67]);
+    });
+
+    it('should cycle through chord notes', () => {
+      pattern.setNotes([60, 64, 67]); // C major
+      
+      expect(pattern.getNextChordNote()).toBe(60);
+      expect(pattern.getNextChordNote()).toBe(64);
+      expect(pattern.getNextChordNote()).toBe(67);
+      expect(pattern.getNextChordNote()).toBe(60); // Wraps
+    });
+  });
+
+  describe('Step Duration', () => {
+    it('should calculate step duration at 120 BPM', () => {
+      pattern.setBpm(120);
+      // 1/16th note at 120 BPM = 60/120/4 = 0.125 seconds
+      expect(pattern.getStepDuration()).toBeCloseTo(0.125, 3);
+    });
+
+    it('should calculate step duration at 60 BPM', () => {
+      pattern.setBpm(60);
+      // 1/16th note at 60 BPM = 60/60/4 = 0.25 seconds
+      expect(pattern.getStepDuration()).toBeCloseTo(0.25, 3);
+    });
+  });
+
+  describe('Pattern Display', () => {
+    it('should return display name for pattern', () => {
+      expect(pattern.getPatternDisplayName()).toBe('STRAIGHT');
+      pattern.setPattern('tresillo');
+      expect(pattern.getPatternDisplayName()).toBe('TRESILLO');
+    });
+  });
+
+  describe('Start/Stop', () => {
+    it('should start and set isRunning', () => {
+      pattern.start([60, 64, 67]);
+      expect(pattern.isRunning).toBe(true);
+      expect(pattern.currentNotes.length).toBe(3);
+    });
+
+    it('should stop and clear state', () => {
+      pattern.start([60, 64, 67]);
+      pattern.stop();
+      expect(pattern.isRunning).toBe(false);
+    });
+
+    it('should not start with empty notes', () => {
+      pattern.start([]);
+      expect(pattern.isRunning).toBe(false);
     });
   });
 });

@@ -311,6 +311,219 @@ export class Arpeggiator {
 }
 
 /**
+ * PatternPlayer - Plays chord notes in pre-determined rhythmic patterns
+ * Unlike arpeggiator, patterns maintain consistent timing regardless of note count
+ */
+export class PatternPlayer {
+  constructor(audioContext, callbacks = {}) {
+    this.ctx = audioContext;
+    this.onNoteOn = callbacks.onNoteOn || (() => {});
+    this.onNoteOff = callbacks.onNoteOff || (() => {});
+    
+    // Timing
+    this.bpm = 120;
+    
+    // Predefined rhythm patterns (1 = note, 0 = rest)
+    // Each pattern is 16 steps at 1/16th note resolution
+    this.patterns = {
+      'straight': [1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0],  // Straight 8ths
+      'offbeat':  [0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1],  // Offbeat 8ths
+      'pulse':    [1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0],  // Quarter notes
+      'tresillo': [1,0,0,1,0,0,1,0,1,0,0,1,0,0,1,0],  // 3-3-2 tresillo
+      'clave':    [1,0,0,1,0,0,1,0,0,0,1,0,1,0,0,0],  // Son clave
+      'shuffle':  [1,0,1,1,0,1,1,0,1,1,0,1,1,0,1,0],  // Shuffle feel
+      'waltz':    [1,0,0,0,0,0,1,0,0,1,0,0,0,0,0,0],  // 3/4 feel (12 steps used)
+      'funk':     [1,0,0,1,0,1,0,0,1,0,0,1,0,1,0,0],  // Funky syncopation
+    };
+    
+    this.patternOrder = ['straight', 'offbeat', 'pulse', 'tresillo', 'clave', 'shuffle', 'waltz', 'funk'];
+    this.currentPatternName = 'straight';
+    
+    // State
+    this.isRunning = false;
+    this.currentNotes = [];
+    this.stepIndex = 0;
+    this.noteIndex = 0; // Which chord note to play next
+    this.lastPlayedNote = null;
+    
+    // Scheduling
+    this.nextStepTime = 0;
+    this.schedulerInterval = null;
+    this.lookahead = 25; // ms
+    this.scheduleAheadTime = 0.1; // seconds
+  }
+  
+  /**
+   * Set the BPM
+   */
+  setBpm(bpm) {
+    this.bpm = Math.max(20, Math.min(300, bpm));
+  }
+  
+  /**
+   * Get current pattern
+   */
+  get pattern() {
+    return this.patterns[this.currentPatternName];
+  }
+  
+  /**
+   * Set pattern by name
+   */
+  setPattern(name) {
+    if (this.patterns[name]) {
+      this.currentPatternName = name;
+      this.stepIndex = 0;
+      this.noteIndex = 0;
+    }
+  }
+  
+  /**
+   * Cycle to next pattern
+   */
+  cyclePattern(direction = 1) {
+    const currentIdx = this.patternOrder.indexOf(this.currentPatternName);
+    const nextIdx = (currentIdx + direction + this.patternOrder.length) % this.patternOrder.length;
+    this.setPattern(this.patternOrder[nextIdx]);
+    return this.currentPatternName;
+  }
+  
+  /**
+   * Get pattern display name
+   */
+  getPatternDisplayName() {
+    const names = {
+      'straight': 'STRAIGHT',
+      'offbeat': 'OFFBEAT',
+      'pulse': 'PULSE',
+      'tresillo': 'TRESILLO',
+      'clave': 'CLAVE',
+      'shuffle': 'SHUFFLE',
+      'waltz': 'WALTZ',
+      'funk': 'FUNK'
+    };
+    return names[this.currentPatternName] || this.currentPatternName.toUpperCase();
+  }
+  
+  /**
+   * Set the notes to pattern through
+   */
+  setNotes(notes) {
+    this.currentNotes = [...notes].sort((a, b) => a - b);
+    // Don't reset noteIndex - allows smooth chord changes
+  }
+  
+  /**
+   * Get step duration (1/16th note)
+   */
+  getStepDuration() {
+    // Each step is a 1/16th note
+    const secondsPerBeat = 60 / this.bpm;
+    return secondsPerBeat / 4; // 1/16th = 1/4 of a beat
+  }
+  
+  /**
+   * Get the next note from the chord (cycles through)
+   */
+  getNextChordNote() {
+    if (this.currentNotes.length === 0) return null;
+    const note = this.currentNotes[this.noteIndex % this.currentNotes.length];
+    this.noteIndex = (this.noteIndex + 1) % this.currentNotes.length;
+    return note;
+  }
+  
+  /**
+   * Schedule the next step
+   */
+  scheduleStep(time) {
+    const pattern = this.pattern;
+    const shouldPlay = pattern[this.stepIndex] === 1;
+    
+    // Stop previous note
+    if (this.lastPlayedNote !== null) {
+      this.onNoteOff(this.lastPlayedNote);
+      this.lastPlayedNote = null;
+    }
+    
+    if (shouldPlay && this.currentNotes.length > 0) {
+      const note = this.getNextChordNote();
+      if (note !== null) {
+        // Slight velocity variation for humanization
+        const velocity = 90 + Math.floor(Math.random() * 20);
+        this.onNoteOn(note, velocity, time);
+        this.lastPlayedNote = note;
+        
+        // Schedule note off before next step
+        const stepDuration = this.getStepDuration();
+        setTimeout(() => {
+          if (this.lastPlayedNote === note) {
+            this.onNoteOff(note);
+            this.lastPlayedNote = null;
+          }
+        }, stepDuration * 0.8 * 1000);
+      }
+    }
+    
+    // Advance step
+    this.stepIndex = (this.stepIndex + 1) % pattern.length;
+  }
+  
+  /**
+   * Main scheduler loop
+   */
+  scheduler() {
+    while (this.nextStepTime < this.ctx.currentTime + this.scheduleAheadTime) {
+      this.scheduleStep(this.nextStepTime);
+      this.nextStepTime += this.getStepDuration();
+    }
+  }
+  
+  /**
+   * Start the pattern player
+   */
+  start(notes = []) {
+    if (notes.length > 0) {
+      this.setNotes(notes);
+    }
+    
+    if (this.currentNotes.length === 0) return;
+    
+    this.isRunning = true;
+    this.stepIndex = 0;
+    this.noteIndex = 0;
+    this.nextStepTime = this.ctx.currentTime;
+    
+    if (!this.schedulerInterval) {
+      this.schedulerInterval = setInterval(() => this.scheduler(), this.lookahead);
+    }
+  }
+  
+  /**
+   * Stop the pattern player
+   */
+  stop() {
+    this.isRunning = false;
+    
+    if (this.schedulerInterval) {
+      clearInterval(this.schedulerInterval);
+      this.schedulerInterval = null;
+    }
+    
+    if (this.lastPlayedNote !== null) {
+      this.onNoteOff(this.lastPlayedNote);
+      this.lastPlayedNote = null;
+    }
+  }
+  
+  /**
+   * Update notes while running
+   */
+  updateNotes(notes) {
+    this.setNotes(notes);
+  }
+}
+
+/**
  * Strum - Plays chord notes with slight timing offsets
  */
 export class Strummer {
