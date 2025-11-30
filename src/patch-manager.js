@@ -9,6 +9,8 @@ import { AnalogFlower } from './patches/02-analog-flower.js';
 import { MellowBells } from './patches/03-mellow-bells.js';
 import { WarmLead } from './patches/04-warm-lead.js';
 import { TapeStrings } from './patches/05-tape-strings.js';
+import { FMHarp } from './patches/06-fm-harp.js';
+import { CathedralOrgan } from './patches/07-cathedral-organ.js';
 
 // Registry of all available patches (ordered)
 export const PATCHES = {
@@ -16,7 +18,9 @@ export const PATCHES = {
   'analog-flower': AnalogFlower,
   'mellow-bells': MellowBells,
   'warm-lead': WarmLead,
-  'tape-strings': TapeStrings
+  'tape-strings': TapeStrings,
+  'fm-harp': FMHarp,
+  'cathedral-organ': CathedralOrgan
 };
 
 // Ordered list for browsing
@@ -25,7 +29,9 @@ export const PATCH_ORDER = [
   'analog-flower',
   'mellow-bells',
   'warm-lead',
-  'tape-strings'
+  'tape-strings',
+  'fm-harp',
+  'cathedral-organ'
 ];
 
 // Default patch
