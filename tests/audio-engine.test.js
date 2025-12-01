@@ -33,6 +33,7 @@ const createBiquadFilterMock = vi.fn(() => ({
   connect: vi.fn(),
   frequency: { value: 0 },
   Q: { value: 0 },
+  gain: { value: 0 },
   type: 'lowpass'
 }));
 
@@ -56,6 +57,23 @@ const createWaveShaperMock = vi.fn(() => ({
   oversample: 'none',
 }));
 
+const createStereoPannerMock = vi.fn(() => ({
+  connect: vi.fn(),
+  pan: { value: 0 }
+}));
+
+const createConstantSourceMock = vi.fn(() => ({
+  connect: vi.fn(),
+  start: vi.fn(),
+  stop: vi.fn(),
+  offset: { value: 0 }
+}));
+
+const createMediaStreamDestinationMock = vi.fn(() => ({
+  stream: {},
+  connect: vi.fn()
+}));
+
 const audioContextMock = {
   createGain: createGainMock,
   createOscillator: createOscillatorMock,
@@ -63,6 +81,9 @@ const audioContextMock = {
   createDynamicsCompressor: createDynamicsCompressorMock,
   createDelay: createDelayMock,
   createWaveShaper: createWaveShaperMock,
+  createStereoPanner: createStereoPannerMock,
+  createConstantSource: createConstantSourceMock,
+  createMediaStreamDestination: createMediaStreamDestinationMock,
   destination: {},
   currentTime: 0,
   state: 'suspended',

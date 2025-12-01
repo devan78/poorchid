@@ -5,6 +5,19 @@ import { PoorchidApp } from '../src/main';
 vi.mock('../src/audio-engine', () => {
   return {
     AudioEngine: vi.fn().mockImplementation(() => ({
+      ctx: {
+        createGain: vi.fn(() => ({ 
+          gain: { value: 0 }, 
+          connect: vi.fn() 
+        })),
+        createOscillator: vi.fn(() => ({
+          connect: vi.fn(),
+          start: vi.fn(),
+          stop: vi.fn(),
+          frequency: { value: 0 }
+        })),
+        currentTime: 0
+      },
       resume: vi.fn(),
       playChord: vi.fn(),
       stopAll: vi.fn(),
@@ -13,7 +26,17 @@ vi.mock('../src/audio-engine', () => {
       setBassVolume: vi.fn(),
       setVolume: vi.fn(),
       setFilterCutoff: vi.fn(),
-      setPatch: vi.fn()
+      setPatch: vi.fn(),
+      setFxLevels: vi.fn(),
+      setFxBpm: vi.fn(),
+      setFxBypass: vi.fn(),
+      setFlavourEnabled: vi.fn(),
+      playNote: vi.fn(),
+      stopNote: vi.fn(),
+      playArpNote: vi.fn(),
+      playClick: vi.fn(),
+      activeOscillators: new Map(),
+      masterGain: { gain: { value: 0 }, connect: vi.fn() }
     }))
   };
 });

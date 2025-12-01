@@ -62,35 +62,64 @@ export class PoorchidUI {
         <!-- OLED Display -->
         <div class="oled-display">
           <div class="oled-screen">
+            <!-- Top Bar: Status & Volume -->
             <div class="oled-header">
-              <span>POORCHID</span>
+              <div class="oled-status-icons">
+                <span class="status-icon ${state.powered ? 'active' : ''}" title="Power">PWR</span>
+                <span class="status-icon ${state.midiConnected ? 'active' : ''}" title="MIDI">MIDI</span>
+                <span class="status-icon ${state.looperState !== 'idle' ? 'active' : ''}" title="Looper">
+                  ${state.looperState === 'recording' ? `REC ${state.loopBarsRecorded || ''}` : 
+                    (state.looperState === 'overdubbing' ? `DUB ${state.loopBarsRecorded || ''}` : 
+                    (state.looperState === 'playing' ? `PLAY ${state.loopBarsRecorded || ''}` : 'LOOP'))}
+                </span>
+              </div>
               <span class="oled-volume" data-volume="${state.volume}">VOL ${state.volume}</span>
             </div>
-            <div class="oled-content">
+
+            <!-- Main Content: Patch & Chord -->
+            <div class="oled-main-section">
               <div class="oled-patch-name">${this.getPatchDisplayName(state.currentPatch)}</div>
-              <div class="oled-main-text">${state.root} ${state.type}</div>
-            <div class="oled-sub-text">${state.extensions.size > 0 ? Array.from(state.extensions).join(' ') : 'No extensions'}</div>
-          </div>
-          <div class="oled-info-row">
-            <span class="oled-key-mode ${state.keyEnabled ? 'active' : ''}">${this.getKeyDisplay(state)}</span>
-            <span class="oled-bass-mode ${state.bassEnabled ? 'active' : ''}">${state.bassEnabled ? state.bassMode.toUpperCase() : ''}</span>
-          </div>
-          <div class="oled-info-row">
-            <span class="oled-perform-mode ${state.performMode !== 'direct' ? 'active' : ''}">${this.getPerformModeDisplay(state)}</span>
-            <span class="oled-bpm">${state.bpm} BPM</span>
-          </div>
-          <div class="oled-info-row">
-            <span class="oled-fx ${state.currentEffect !== 'direct' ? 'active' : ''}">${this.getFxDisplay(state)}</span>
-            <span class="oled-fx-level">${state.currentEffect === 'direct' ? '' : this.getFxLevel(state)}</span>
-          </div>
-          <div class="oled-status">
-            <span class="status-item ${state.powered ? 'active' : ''}">PWR</span>
-            <span class="status-item ${state.midiConnected ? 'active' : ''}">MIDI</span>
-            <span class="status-item ${state.looperState !== 'idle' ? 'active' : ''}">LOOP</span>
-            <span class="status-item">STYLE ${state.playstyle.toUpperCase()}</span>
+              <div class="oled-chord-display">
+                <span class="oled-chord-root">${state.root}</span>
+                <span class="oled-chord-type">${state.type}</span>
+              </div>
+              <div class="oled-extensions">${state.extensions.size > 0 ? Array.from(state.extensions).join(' ') : '—'}</div>
+            </div>
+
+            <!-- Bottom Grid: Parameters -->
+            <div class="oled-grid">
+              <!-- Row 1: Key & Bass -->
+              <div class="oled-grid-cell">
+                <span class="oled-label">KEY</span>
+                <span class="oled-value oled-key-value ${state.keyEnabled ? 'active' : ''}">${this.getKeyDisplay(state)}</span>
+              </div>
+              <div class="oled-grid-cell">
+                <span class="oled-label">BASS</span>
+                <span class="oled-value oled-bass-value ${state.bassEnabled ? 'active' : ''}">${state.bassEnabled ? state.bassMode.toUpperCase() : 'OFF'}</span>
+              </div>
+
+              <!-- Row 2: Perform & BPM -->
+              <div class="oled-grid-cell">
+                <span class="oled-label">MODE</span>
+                <span class="oled-value oled-mode-value ${state.performMode !== 'direct' ? 'active' : ''}">${this.getPerformModeDisplay(state)}</span>
+              </div>
+              <div class="oled-grid-cell">
+                <span class="oled-label">BPM</span>
+                <span class="oled-value oled-bpm-value ${state.beatEnabled ? 'active' : ''}">${state.beatEnabled ? state.beatPattern.toUpperCase() : state.bpm}</span>
+              </div>
+
+              <!-- Row 3: FX & Style -->
+              <div class="oled-grid-cell">
+                <span class="oled-label">FX</span>
+                <span class="oled-value oled-fx-value ${state.currentEffect !== 'direct' ? 'active' : ''}">${this.getFxDisplay(state)} ${state.currentEffect !== 'direct' ? this.getFxLevel(state) : ''}</span>
+              </div>
+              <div class="oled-grid-cell">
+                <span class="oled-label">STYLE</span>
+                <span class="oled-value oled-style-value">${state.playstyle.toUpperCase()}</span>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
 
         <!-- Right Encoders -->
         <div class="encoder-group right-encoders">
@@ -106,7 +135,7 @@ export class PoorchidUI {
             </div>
             <span class="encoder-label">Loop</span>
           </div>
-          <div class="encoder charcoal" data-encoder="bpm">
+          <div class="encoder charcoal ${state.beatEnabled ? 'yellow active' : ''}" data-encoder="bpm" title="Click to toggle beats, rotate for BPM/Pattern">
             <div class="encoder-knob">
               <div class="encoder-indicator"></div>
             </div>
@@ -278,47 +307,54 @@ export class PoorchidUI {
     }
 
     // OLED Status indicators
-    const pwrStatus = this.container.querySelector('.status-item:nth-child(1)');
-    if (pwrStatus) {
-      pwrStatus.classList.toggle('active', state.powered);
+    const statusIcons = this.container.querySelectorAll('.status-icon');
+    if (statusIcons.length >= 3) {
+      // PWR
+      statusIcons[0].classList.toggle('active', state.powered);
+      // MIDI
+      statusIcons[1].classList.toggle('active', state.midiConnected);
+      // LOOPER
+      const looperIcon = statusIcons[2];
+      looperIcon.classList.toggle('active', state.looperState !== 'idle');
+      
+      let looperText = 'LOOP';
+      if (state.looperState === 'idle') {
+         looperText = state.loopLength === 'free' ? 'FREE' : `${state.loopLength}B`;
+      } else {
+         if (state.looperState === 'recording') looperText = 'REC';
+         else if (state.looperState === 'overdubbing') looperText = 'DUB';
+         else if (state.looperState === 'playing') {
+             // Show menu selection if it's not 'play' (default)
+             if (state.loopMenu !== 'play') {
+                 looperText = state.loopMenu.toUpperCase();
+             } else {
+                 looperText = 'PLAY';
+             }
+         }
+      }
+      looperIcon.textContent = looperText;
     }
 
-    const midiStatus = this.container.querySelector('.status-item:nth-child(2)');
-    if (midiStatus) {
-      midiStatus.classList.toggle('active', state.midiConnected);
-    }
-
-    const loopStatus = this.container.querySelector('.status-item:nth-child(3)');
-    if (loopStatus) {
-      loopStatus.classList.toggle('active', state.looperState !== 'idle');
-    }
-
-    const fxDisplay = this.container.querySelector('.oled-fx');
+    // FX Display
+    const fxDisplay = this.container.querySelector('.oled-fx-value');
     if (fxDisplay) {
-      fxDisplay.textContent = this.getFxDisplay(state);
+      const fxText = `${this.getFxDisplay(state)} ${state.currentEffect !== 'direct' ? this.getFxLevel(state) : ''}`;
+      fxDisplay.textContent = fxText;
       fxDisplay.classList.toggle('active', state.currentEffect !== 'direct');
     }
 
-    const fxLevel = this.container.querySelector('.oled-fx-level');
-    if (fxLevel) {
-      fxLevel.textContent = state.currentEffect === 'direct' ? '' : this.getFxLevel(state);
+    // Bass mode display
+    const bassDisplay = this.container.querySelector('.oled-bass-value');
+    if (bassDisplay) {
+      bassDisplay.textContent = state.bassEnabled ? state.bassMode.toUpperCase() : 'OFF';
+      bassDisplay.classList.toggle('active', state.bassEnabled);
     }
 
-    // Bass mode display on OLED
-    const bassModeDisplay = this.container.querySelector('.oled-bass-mode');
-    if (bassModeDisplay) {
-      const text = state.bassEnabled ? `BASS: ${state.bassMode.toUpperCase()}` : '';
-      bassModeDisplay.textContent = text;
-      const isDirect = state.bassMode === 'direct';
-      bassModeDisplay.classList.toggle('active', state.bassEnabled && !isDirect);
-      bassModeDisplay.classList.toggle('inactive', isDirect);
-    }
-
-    // Key mode display on OLED
-    const keyModeDisplay = this.container.querySelector('.oled-key-mode');
-    if (keyModeDisplay) {
-      keyModeDisplay.textContent = this.getKeyDisplay(state);
-      keyModeDisplay.classList.toggle('active', state.keyEnabled);
+    // Key mode display
+    const keyDisplay = this.container.querySelector('.oled-key-value');
+    if (keyDisplay) {
+      keyDisplay.textContent = this.getKeyDisplay(state);
+      keyDisplay.classList.toggle('active', state.keyEnabled);
     }
 
     // Key encoder visual state
@@ -327,22 +363,61 @@ export class PoorchidUI {
       keyEncoder.classList.toggle('active', state.keyEnabled);
     }
 
-    const playstyleStatus = this.container.querySelector('.oled-status .status-item:nth-child(4)');
-    if (playstyleStatus) {
-      playstyleStatus.textContent = `STYLE ${state.playstyle.toUpperCase()}`;
+    // Loop encoder visual state
+    const loopEncoder = this.container.querySelector('.encoder[data-encoder="loop"]');
+    if (loopEncoder) {
+      const isActive = state.looperState !== 'idle';
+      loopEncoder.classList.toggle('active', isActive);
+      
+      // Update color based on state
+      loopEncoder.classList.remove('charcoal', 'red', 'yellow', 'green');
+      if (state.looperState === 'recording') {
+        loopEncoder.classList.add('red');
+      } else if (state.looperState === 'overdubbing') {
+        loopEncoder.classList.add('yellow');
+      } else if (state.looperState === 'playing') {
+        loopEncoder.classList.add('green'); // Assuming green class exists or will fallback to active style
+      } else {
+        loopEncoder.classList.add('charcoal');
+      }
     }
 
-    // Perform mode display on OLED
-    const performModeDisplay = this.container.querySelector('.oled-perform-mode');
-    if (performModeDisplay) {
-      performModeDisplay.textContent = this.getPerformModeDisplay(state);
-      performModeDisplay.classList.toggle('active', state.performMode !== 'direct');
+    // Style display
+    const styleDisplay = this.container.querySelector('.oled-style-value');
+    if (styleDisplay) {
+      styleDisplay.textContent = state.playstyle.toUpperCase();
     }
 
-    // BPM display on OLED
-    const bpmDisplay = this.container.querySelector('.oled-bpm');
+    // Perform mode display
+    const performDisplay = this.container.querySelector('.oled-mode-value');
+    if (performDisplay) {
+      performDisplay.textContent = this.getPerformModeDisplay(state);
+      performDisplay.classList.toggle('active', state.performMode !== 'direct');
+    }
+
+    // BPM display
+    const bpmDisplay = this.container.querySelector('.oled-bpm-value');
     if (bpmDisplay) {
-      bpmDisplay.textContent = `${state.bpm} BPM`;
+      if (state.beatEnabled) {
+        bpmDisplay.textContent = state.beatPattern.toUpperCase();
+        bpmDisplay.classList.add('active');
+      } else {
+        bpmDisplay.textContent = `${state.bpm}`;
+        bpmDisplay.classList.remove('active');
+      }
+    }
+
+    // BPM encoder visual state
+    const bpmEncoder = this.container.querySelector('.encoder[data-encoder="bpm"]');
+    if (bpmEncoder) {
+      bpmEncoder.classList.toggle('active', state.beatEnabled);
+      if (state.beatEnabled) {
+        bpmEncoder.classList.remove('charcoal');
+        bpmEncoder.classList.add('yellow');
+      } else {
+        bpmEncoder.classList.remove('yellow');
+        bpmEncoder.classList.add('charcoal');
+      }
     }
 
     // Perform encoder visual state
@@ -352,6 +427,20 @@ export class PoorchidUI {
       const engaged = state.performMode !== 'direct';
       this.encoderEngaged.set('perform', engaged);
       performEncoder.classList.toggle('active', engaged);
+      
+      // Sync internal value from state
+      if (state.performMode === 'arp') {
+        const divisions = ['1/1', '1/2', '1/4', '1/8', '1/16', '1/32', '1/4T', '1/8T', '1/16T'];
+        const index = divisions.indexOf(state.arpDivision);
+        if (index !== -1) this._currentPerformValue = Math.round((index * 11) + 5);
+      } else if (state.performMode === 'strum') {
+        this._currentPerformValue = state.strumSpeed;
+      } else if (state.performMode === 'pattern') {
+        const patterns = ['straight', 'offbeat', 'pulse', 'tresillo', 'clave', 'shuffle', 'waltz', 'funk'];
+        const index = patterns.indexOf(state.rhythmPattern);
+        if (index !== -1) this._currentPerformValue = Math.round((index * 12.5) + 6);
+      }
+
       const knob = performEncoder.querySelector('.encoder-knob');
       if (knob) {
         const rotation = engaged ? (this._currentPerformValue / 99) * 270 - 135 : 0;
@@ -373,7 +462,7 @@ export class PoorchidUI {
     }
 
     this._currentBpmValue = Math.round(((state.bpm - 20) / 280) * 99);
-    this._currentPerformValue = this._currentPerformValue ?? 50;
+    // this._currentPerformValue is now updated in the block above
     this._fxStateSnapshot = {
       currentEffect: state.currentEffect,
       fxLevels: { ...state.fxLevels },
@@ -414,6 +503,13 @@ export class PoorchidUI {
       flavourToggle.classList.toggle('active', state.flavourEnabled);
       flavourToggle.textContent = state.flavourEnabled ? 'Flavour On' : 'Flavour Off';
       flavourToggle.title = state.flavourEnabled ? 'Secret flavour chain enabled' : 'Secret flavour chain bypassed';
+    }
+
+    const recordBtn = document.getElementById('record-btn');
+    if (recordBtn) {
+      recordBtn.classList.toggle('active', state.recording);
+      recordBtn.textContent = state.recording ? 'Recording...' : 'Record';
+      recordBtn.title = state.recording ? 'Recording live output' : 'Record live output to file';
     }
 
     // Hidden controls (for keyboard shortcuts to still work)
@@ -552,6 +648,11 @@ export class PoorchidUI {
     // Track long-press for BPM encoder (tap tempo)
     let bpmLongPressTimer = null;
     let bpmWasLongPress = false;
+    
+    // Track long-press for Loop encoder
+    let loopLongPressTimer = null;
+    let loopWasLongPress = false;
+    
     let volumeHeld = false;
 
     // Chord type press/release handling (for playstyle behaviors)
@@ -607,6 +708,15 @@ export class PoorchidUI {
           this.actions.toggleMetronome(); // Long press = toggle metronome
         }, 500);
       }
+
+      const loopEncoder = e.target.closest('.encoder[data-encoder="loop"]');
+      if (loopEncoder) {
+        loopWasLongPress = false;
+        loopLongPressTimer = setTimeout(() => {
+          loopWasLongPress = true;
+          this.actions.loopStop(); // Long press = Stop
+        }, 500);
+      }
     });
 
     this.container.addEventListener('mouseup', (e) => {
@@ -625,6 +735,10 @@ export class PoorchidUI {
       if (bpmLongPressTimer) {
         clearTimeout(bpmLongPressTimer);
         bpmLongPressTimer = null;
+      }
+      if (loopLongPressTimer) {
+        clearTimeout(loopLongPressTimer);
+        loopLongPressTimer = null;
       }
       volumeHeld = false;
     });
@@ -645,6 +759,10 @@ export class PoorchidUI {
       if (bpmLongPressTimer) {
         clearTimeout(bpmLongPressTimer);
         bpmLongPressTimer = null;
+      }
+      if (loopLongPressTimer) {
+        clearTimeout(loopLongPressTimer);
+        loopLongPressTimer = null;
       }
     });
 
@@ -682,11 +800,23 @@ export class PoorchidUI {
         return;
       }
 
-      // BPM encoder click (short press = tap tempo)
+      // BPM encoder click (short press = toggle beat engine)
       const bpmEncoder = e.target.closest('.encoder[data-encoder="bpm"]');
       if (bpmEncoder && !bpmWasLongPress) {
-        this.actions.tapTempo();
+        this.actions.toggleBeatEngine();
         this.encoderEngaged.set('bpm', true);
+        return;
+      }
+
+      // Loop encoder click
+      const loopEncoder = e.target.closest('.encoder[data-encoder="loop"]');
+      if (loopEncoder && !loopWasLongPress) {
+        if (e.shiftKey) {
+          this.actions.undoLoop();
+        } else {
+          this.actions.clickLoopEncoder();
+        }
+        this.encoderEngaged.set('loop', true);
         return;
       }
 
@@ -740,7 +870,7 @@ export class PoorchidUI {
     });
 
     // === ENCODER DRAG & WHEEL SYSTEM ===
-    // Best practice: drag up = increase (clockwise), drag down = decrease (counter-clockwise)
+    // Best practice: drag up = increase (clockwise), drag down = decrease
     // Sensitivity: ~2px of movement per unit change
     
     let dragState = null; // { encoder, startY, startValue }
@@ -830,15 +960,16 @@ export class PoorchidUI {
               const rotation = (this._currentFxValue / 99) * 270 - 135;
               knob.style.transform = `rotate(${rotation}deg)`;
             }
-            const fxDisplay = this.container.querySelector('.oled-fx');
+            const fxDisplay = this.container.querySelector('.oled-fx-value');
             if (fxDisplay) {
               const snapshot = this._fxStateSnapshot || {};
               const levels = { ...(snapshot.fxLevels || {}), [effect]: this._currentFxValue };
-              fxDisplay.textContent = this.getFxDisplay({
+              const stateMock = {
                 currentEffect: effect,
                 fxLevels: levels,
                 fxLocked: snapshot.fxLocked || false
-              });
+              };
+              fxDisplay.textContent = `${this.getFxDisplay(stateMock)} ${this.getFxLevel(stateMock)}`;
             }
           }
           return;
@@ -865,6 +996,23 @@ export class PoorchidUI {
       
         // BPM encoder: finite rotation (20-300 BPM mapped to 0-99 arc)
         if (encoderName === 'bpm') {
+          // If Beat Engine is enabled, use infinite rotation for pattern selection
+          if (this.state && this.state.beatEnabled) {
+             if (!this.encoderRotations[encoderName]) {
+               this.encoderRotations[encoderName] = 0;
+             }
+             this.encoderRotations[encoderName] += delta * 3;
+             const knob = encoder.querySelector('.encoder-knob');
+             if (knob) {
+               knob.style.transform = `rotate(${this.encoderRotations[encoderName]}deg)`;
+             }
+             if (Math.abs(delta) >= 1) {
+               const direction = delta > 0 ? 1 : -1;
+               this.actions.cycleBeatPattern(direction);
+             }
+             return;
+          }
+
           if (this._currentBpmValue === undefined) this._currentBpmValue = 36; // 120 BPM default
         const newValue = clamp(this._currentBpmValue + delta * step, 0, 99);
         
@@ -905,7 +1053,13 @@ export class PoorchidUI {
             this.actions.cycleKeyRoot(direction); // Rotate to change key
           }
           if (encoderName === 'options') {
+            // Options encoder is now unused for playstyle, but we can keep it for future use
+            // or map it to something else. For now, let's map it to Playstyle as before
+            // but we might want to move Playstyle to Shift+Perform later.
             this.actions.cyclePlaystyle(direction);
+          }
+          if (encoderName === 'loop') {
+            this.actions.cycleLoopEncoder(direction);
           }
         }
       };
@@ -1047,6 +1201,11 @@ export class PoorchidUI {
     const flavourToggle = document.getElementById('flavour-toggle');
     if (flavourToggle) {
       flavourToggle.addEventListener('click', () => this.actions.toggleFlavour());
+    }
+
+    const recordBtn = document.getElementById('record-btn');
+    if (recordBtn) {
+      recordBtn.addEventListener('click', () => this.actions.toggleRecording());
     }
   }
 }

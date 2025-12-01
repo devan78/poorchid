@@ -61,6 +61,12 @@ header {
   gap: 10px;
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 h1 {
   font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
   font-weight: 300;
@@ -447,7 +453,8 @@ header p {
   transform: translateY(-2px);
 }
 
-.flavour-toggle {
+.flavour-toggle,
+.record-btn {
   background: linear-gradient(180deg, #1e1e1e, #121212);
   border: 1px solid #2f2f2f;
   border-radius: 8px;
@@ -463,7 +470,8 @@ header p {
   transition: color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
 }
 
-.flavour-toggle:hover {
+.flavour-toggle:hover,
+.record-btn:hover {
   color: #cfcfcf;
   border-color: #3a3a3a;
 }
@@ -478,8 +486,19 @@ header p {
     0 0 12px rgba(211,84,0,0.35);
 }
 
-.flavour-toggle:focus-visible {
+.flavour-toggle:focus-visible,
+.record-btn:focus-visible {
   outline: 1px solid var(--accent-orange);
+}
+
+.record-btn.active {
+  color: #f5f1e8;
+  border-color: var(--accent-red);
+  background: linear-gradient(180deg, #2f1b1b, #1b0f0f);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.12),
+    0 4px 10px rgba(0,0,0,0.6),
+    0 0 14px rgba(184,50,39,0.35);
 }
 
 .encoder-knob {
@@ -662,6 +681,32 @@ header p {
   box-shadow: 0 0 10px rgba(255,68,68,0.9);
 }
 
+/* Green Encoder (Looper Play) */
+.encoder.green .encoder-knob {
+  --knob-color: #1a9178;
+  --knob-highlight: #2abfa0;
+  --knob-shadow: #126654;
+}
+
+.encoder.green .encoder-indicator {
+  background: #fff;
+  box-shadow: 0 0 6px rgba(255,255,255,0.8);
+}
+
+.encoder.green.active .encoder-knob {
+  --knob-color: #20b090;
+  --knob-highlight: #30d0b0;
+  box-shadow:
+    0 0 12px rgba(32, 176, 144, 0.5),
+    inset 0 3px 6px var(--knob-highlight),
+    inset 0 -3px 6px var(--knob-shadow);
+}
+
+.encoder.green.active .encoder-indicator {
+  background: #40ffcc;
+  box-shadow: 0 0 10px rgba(64, 255, 204, 0.9);
+}
+
 /* Bass mode label under encoder */
 .encoder-mode {
   display: block;
@@ -730,175 +775,134 @@ header p {
 }
 
 .oled-header {
-  font-size: 0.5rem;
-  color: #00b4dc;
-  letter-spacing: 0.3em;
-  margin-bottom: 6px;
-  text-shadow: 0 0 8px rgba(0, 180, 220, 0.6);
-  position: relative;
-  z-index: 1;
   display: flex;
   justify-content: space-between;
   align-items: center;
+  margin-bottom: 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid #222;
+  position: relative;
+  z-index: 1;
+}
+
+.oled-status-icons {
+  display: flex;
+  gap: 8px;
+}
+
+.status-icon {
+  font-size: 0.45rem;
+  color: #444;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+  transition: color 0.2s, text-shadow 0.2s;
+}
+
+.status-icon.active {
+  color: #00b4dc;
+  text-shadow: 0 0 5px rgba(0, 180, 220, 0.6);
+}
+
+.status-icon[title="Looper"].active {
+  color: #ff5252;
+  text-shadow: 0 0 5px rgba(255, 82, 82, 0.6);
 }
 
 .oled-volume {
   font-size: 0.45rem;
-  color: #888;
-  letter-spacing: 0.1em;
-  text-shadow: none;
+  color: #666;
+  letter-spacing: 0.05em;
   font-weight: 500;
   transition: color 0.15s ease;
 }
 
-/* Highlight volume when recently changed */
 .oled-volume:hover {
   color: #00b4dc;
   text-shadow: 0 0 6px rgba(0, 180, 220, 0.5);
 }
 
-.oled-bass-mode {
-  font-size: 0.45rem;
-  color: #666;
-  letter-spacing: 0.1em;
-  text-shadow: none;
-  font-weight: 500;
-  transition: color 0.15s ease;
-}
-
-.oled-bass-mode.active {
-  color: #ff9800;
-  text-shadow: 0 0 6px rgba(255, 152, 0, 0.5);
-}
-
-.oled-bass-mode.inactive {
-  color: #444;
-  text-shadow: none;
-}
-
-.oled-key-mode {
-  font-size: 0.45rem;
-  color: #666;
-  letter-spacing: 0.1em;
-  text-shadow: none;
-  font-weight: 500;
-  transition: color 0.15s ease;
-}
-
-.oled-key-mode.active {
-  color: #00e5ff;
-  text-shadow: 0 0 6px rgba(0, 229, 255, 0.5);
-}
-
-.oled-perform-mode {
-  font-size: 0.45rem;
-  color: #666;
-  letter-spacing: 0.1em;
-  text-shadow: none;
-  font-weight: 500;
-  transition: color 0.15s ease;
-}
-
-.oled-perform-mode.active {
-  color: #ffeb3b;
-  text-shadow: 0 0 6px rgba(255, 235, 59, 0.5);
-}
-
-.oled-fx {
-  font-size: 0.45rem;
-  color: #666;
-  letter-spacing: 0.1em;
-  text-shadow: none;
-  font-weight: 500;
-  transition: color 0.15s ease;
-}
-
-.oled-fx.active {
-  color: #ffeb3b;
-  text-shadow: 0 0 6px rgba(255, 235, 59, 0.5);
-}
-
-.oled-fx-level {
-  font-size: 0.45rem;
-  color: #888;
-  letter-spacing: 0.1em;
-  text-shadow: none;
-  font-weight: 500;
-  text-align: right;
-}
-
-.oled-bpm {
-  font-size: 0.45rem;
-  color: #888;
-  letter-spacing: 0.1em;
-  text-shadow: none;
-  font-weight: 500;
-}
-
-.oled-info-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-top: 4px;
-  padding: 0 4px;
-}
-
-.oled-content {
+.oled-main-section {
   text-align: center;
+  margin-bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 50px;
   position: relative;
   z-index: 1;
 }
 
 .oled-patch-name {
-  font-size: 0.6rem;
-  font-weight: 500;
-  color: #00cc88;
-  text-transform: uppercase;
-  letter-spacing: 0.15em;
+  font-size: 0.55rem;
+  color: #888;
+  letter-spacing: 0.1em;
   margin-bottom: 4px;
-  text-shadow: 0 0 8px rgba(0, 204, 136, 0.6);
+  text-transform: uppercase;
 }
 
-.oled-main-text {
-  font-size: 1.1rem;
-  font-weight: 600;
-  color: #00e5ff;
-  text-transform: capitalize;
-  text-shadow: 
-    0 0 10px rgba(0, 229, 255, 0.8),
-    0 0 20px rgba(0, 229, 255, 0.4);
+.oled-chord-display {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 4px;
+  margin-bottom: 2px;
+}
+
+.oled-chord-root {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.4);
+}
+
+.oled-chord-type {
+  font-size: 0.9rem;
+  color: #00b4dc;
+  font-weight: 400;
+}
+
+.oled-extensions {
+  font-size: 0.5rem;
+  color: #666;
+  height: 10px;
   letter-spacing: 0.05em;
 }
 
-.oled-sub-text {
-  font-size: 0.65rem;
-  color: #00b4dc;
-  margin-top: 4px;
-  text-shadow: 0 0 6px rgba(0, 180, 220, 0.5);
-  letter-spacing: 0.1em;
-}
-
-.oled-status {
-  display: flex;
-  justify-content: center;
-  gap: 12px;
-  margin-top: 8px;
-  padding-top: 6px;
-  border-top: 1px solid #1a2a2a;
+.oled-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 12px;
+  padding-top: 8px;
+  border-top: 1px solid #222;
   position: relative;
   z-index: 1;
 }
 
-.status-item {
-  font-size: 0.5rem;
-  color: #333;
-  letter-spacing: 0.1em;
-  transition: color 0.2s, text-shadow 0.2s;
+.oled-grid-cell {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
-.status-item.active {
-  color: #00ff88;
-  text-shadow: 0 0 8px rgba(0, 255, 136, 0.8);
+.oled-label {
+  font-size: 0.4rem;
+  color: #555;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+}
+
+.oled-value {
+  font-size: 0.45rem;
+  color: #888;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  transition: color 0.15s ease;
+}
+
+.oled-value.active {
+  color: #00b4dc;
+  text-shadow: 0 0 4px rgba(0, 180, 220, 0.4);
 }
 
 /* Legacy console panel (hidden but kept for compatibility) */

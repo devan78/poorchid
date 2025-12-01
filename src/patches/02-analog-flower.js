@@ -13,14 +13,14 @@ export const AnalogFlower = {
   
   createVoice(ctx, freq, velocity = 0.8) {
     const now = ctx.currentTime;
-    const velGain = 0.15 + (velocity * 0.2); // Gentle dynamics
-    
+    const velGain = 0.25 + (velocity * 0.35); // More forward dynamics
+  
     // 4 detuned sawtooth oscillators for classic string ensemble
     const oscs = [];
     const detunes = [-12, -5, 5, 12]; // Subtle spread in cents
     
     const mixer = ctx.createGain();
-    mixer.gain.value = 0.25;
+    mixer.gain.value = 0.4;
     
     detunes.forEach((detune) => {
       const osc = ctx.createOscillator();
@@ -29,7 +29,7 @@ export const AnalogFlower = {
       osc.detune.value = detune;
       
       const oscGain = ctx.createGain();
-      oscGain.gain.value = 0.25;
+      oscGain.gain.value = 0.28;
       
       osc.connect(oscGain);
       oscGain.connect(mixer);
@@ -70,7 +70,7 @@ export const AnalogFlower = {
     
     // Output - normalized level
     const output = ctx.createGain();
-    output.gain.value = 0.5;
+    output.gain.value = 0.8;
     ampEnv.connect(output);
     
     return {

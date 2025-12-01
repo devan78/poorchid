@@ -4,6 +4,19 @@ import { PoorchidApp } from '../src/main';
 // Mock dependencies
 vi.mock('../src/audio-engine', () => ({
   AudioEngine: vi.fn().mockImplementation(() => ({
+    ctx: {
+      createGain: vi.fn(() => ({ 
+        gain: { value: 0 }, 
+        connect: vi.fn() 
+      })),
+      createOscillator: vi.fn(() => ({
+        connect: vi.fn(),
+        start: vi.fn(),
+        stop: vi.fn(),
+        frequency: { value: 0 }
+      })),
+      currentTime: 0
+    },
     resume: vi.fn(),
     playChord: vi.fn(),
     stopAll: vi.fn(),
@@ -12,7 +25,17 @@ vi.mock('../src/audio-engine', () => ({
     setBassVolume: vi.fn(),
     setVolume: vi.fn(),
     setFilterCutoff: vi.fn(),
-    setPatch: vi.fn()
+    setPatch: vi.fn(),
+    setFxLevels: vi.fn(),
+    setFxBpm: vi.fn(),
+    setFxBypass: vi.fn(),
+    setFlavourEnabled: vi.fn(),
+    playNote: vi.fn(),
+    stopNote: vi.fn(),
+    playArpNote: vi.fn(),
+    playClick: vi.fn(),
+    activeOscillators: new Map(),
+    masterGain: { gain: { value: 0 }, connect: vi.fn() }
   }))
 }));
 
@@ -82,20 +105,13 @@ describe('MIDI Integration', () => {
   });
 
   it('should handle MIDI Pitch Bend (Pitch Ribbon -> Voicing)', () => {
-    // Pitch Bend Max (16383) -> Voicing 84
-    // LSB = 127 (0x7F), MSB = 127 (0x7F) -> 16383
+    // Pitch bend is currently ignored to keep voicing stable
+    const initialVoicing = app.state.voicingCenter;
+    
+    // Pitch Bend Max (16383)
     app.midi.triggerPitchBend(127, 127);
     
-    expect(app.state.voicingCenter).toBe(84);
-    
-    // Pitch Bend Min (0) -> Voicing 36
-    app.midi.triggerPitchBend(0, 0);
-    expect(app.state.voicingCenter).toBe(36);
-    
-    // Pitch Bend Center (8192) -> Voicing 60
-    // 8192 = 0x2000. LSB = 0, MSB = 64 (0x40)
-    app.midi.triggerPitchBend(0, 64);
-    expect(app.state.voicingCenter).toBe(60);
+    expect(app.state.voicingCenter).toBe(initialVoicing);
   });
   
   it('should handle Keyboard Split (Extensions vs Root)', () => {

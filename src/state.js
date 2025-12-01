@@ -12,6 +12,10 @@ export class PoorchidState {
       midiConnected: false,
       activeMidiNotes: new Set(),
       looperState: 'idle', // idle, recording, playing, overdubbing
+      loopLength: 'free', // free, 1, 2, 4, 8, 16
+      loopProgress: 0,
+      loopBarsRecorded: 0,
+      loopMenu: 'play', // play, overdub, undo, clear, stop
       isPlaying: false,
       bassEnabled: false, // Bass on/off toggle (click Bass dial)
       bassMode: 'chords', // direct, chords, unison, single, solo
@@ -28,12 +32,16 @@ export class PoorchidState {
       performMode: 'direct', // direct, arp, strum, pattern
       arpPattern: 'up', // up, down, updown, random
       arpDivision: '1/8', // Note division
+      arpOctave: 1, // 1-3 octaves
       strumSpeed: 50, // 0-99
       rhythmPattern: 'straight', // Pattern mode: straight, offbeat, pulse, tresillo, clave, shuffle, waltz, funk
       playstyle: 'advanced', // simple, advanced, free
       // BPM
       bpm: 120, // 20-300
       metronomeOn: false,
+      // Beat Engine
+      beatEnabled: false, // Is the beat engine active?
+      beatPattern: 'rock', // Current beat pattern
       // FX System
       currentEffect: 'direct', // Currently selected effect for editing (includes 'direct' for bypass)
       fxLocked: false, // Lock FX settings when changing sounds
@@ -48,6 +56,7 @@ export class PoorchidState {
         tremolo: 0,
         ensemble: 0
       },
+      recording: false,
       ...initialState
     };
     
@@ -190,6 +199,20 @@ export class PoorchidState {
     }
   }
 
+  setLoopProgress(progress) {
+    this.state.loopProgress = progress;
+    // Don't notify for progress to avoid full re-renders, UI handles it directly via requestAnimationFrame usually
+    // But here we might want to notify if we use it for text
+    this.notify(['loopProgress']);
+  }
+
+  setLoopBarsRecorded(bars) {
+    if (this.state.loopBarsRecorded !== bars) {
+      this.state.loopBarsRecorded = bars;
+      this.notify(['loopBarsRecorded']);
+    }
+  }
+
   setMidiConnected(connected) {
     if (this.state.midiConnected !== connected) {
       this.state.midiConnected = connected;
@@ -279,7 +302,7 @@ export class PoorchidState {
 
   // Performance mode methods
   setPerformMode(mode) {
-    const validModes = ['direct', 'arp', 'strum', 'pattern'];
+    const validModes = ['direct', 'arp', 'strum', 'strum2', 'slop', 'harp', 'pattern'];
     if (validModes.includes(mode) && this.state.performMode !== mode) {
       this.state.performMode = mode;
       this.notify(['performMode']);
@@ -287,7 +310,7 @@ export class PoorchidState {
   }
 
   cyclePerformMode() {
-    const modes = ['direct', 'arp', 'strum', 'pattern'];
+    const modes = ['direct', 'arp', 'strum', 'strum2', 'slop', 'harp', 'pattern'];
     const currentIndex = modes.indexOf(this.state.performMode);
     const nextIndex = (currentIndex + 1) % modes.length;
     this.setPerformMode(modes[nextIndex]);
@@ -311,19 +334,42 @@ export class PoorchidState {
   }
 
   setArpDivision(division) {
-    const validDivisions = ['1/1', '1/2', '1/4', '1/8', '1/16', '1/32', '1/4T', '1/8T', '1/16T'];
+    const validDivisions = [
+      '1/1', '1/2', '1/4', '1/8', '1/16', '1/32',
+      '1/4T', '1/8T', '1/16T',
+      '1/4D', '1/8D', '1/16D'
+    ];
     if (validDivisions.includes(division) && this.state.arpDivision !== division) {
       this.state.arpDivision = division;
       this.notify(['arpDivision']);
     }
   }
 
-  cycleArpDivision(direction = 1) {
-    const divisions = ['1/1', '1/2', '1/4', '1/8', '1/16', '1/32', '1/4T', '1/8T', '1/16T'];
+  cycleArpDivision() {
+    const divisions = [
+      '1/1', '1/2', '1/4', '1/8', '1/16', '1/32',
+      '1/4T', '1/8T', '1/16T',
+      '1/4D', '1/8D', '1/16D'
+    ];
     const currentIndex = divisions.indexOf(this.state.arpDivision);
-    const nextIndex = (currentIndex + direction + divisions.length) % divisions.length;
+    const nextIndex = (currentIndex + 1) % divisions.length;
     this.setArpDivision(divisions[nextIndex]);
     return this.state.arpDivision;
+  }
+
+  setArpOctave(octave) {
+    const oct = Math.max(1, Math.min(3, parseInt(octave)));
+    if (this.state.arpOctave !== oct) {
+      this.state.arpOctave = oct;
+      this.notify(['arpOctave']);
+    }
+  }
+
+  cycleArpOctave() {
+    let next = this.state.arpOctave + 1;
+    if (next > 3) next = 1;
+    this.setArpOctave(next);
+    return this.state.arpOctave;
   }
 
   setStrumSpeed(speed) {
@@ -443,5 +489,71 @@ export class PoorchidState {
 
   toggleFlavour() {
     this.setFlavourEnabled(!this.state.flavourEnabled);
+  }
+
+  // Master recorder
+  setRecording(active) {
+    if (this.state.recording !== active) {
+      this.state.recording = active;
+      this.notify(['recording']);
+    }
+  }
+
+  toggleRecording() {
+    this.setRecording(!this.state.recording);
+  }
+
+  setLoopLength(length) {
+    const validLengths = ['free', 1, 2, 4, 8, 16];
+    if (validLengths.includes(length) && this.state.loopLength !== length) {
+      this.state.loopLength = length;
+      this.notify(['loopLength']);
+    }
+  }
+
+  cycleLoopLength(direction = 1) {
+    const lengths = ['free', 1, 2, 4, 8, 16];
+    const currentIndex = lengths.indexOf(this.state.loopLength);
+    const nextIndex = (currentIndex + direction + lengths.length) % lengths.length;
+    this.setLoopLength(lengths[nextIndex]);
+    return this.state.loopLength;
+  }
+
+  setLoopMenu(item) {
+    const validItems = ['play', 'overdub', 'undo', 'clear', 'stop'];
+    if (validItems.includes(item) && this.state.loopMenu !== item) {
+      this.state.loopMenu = item;
+      this.notify(['loopMenu']);
+    }
+  }
+
+  cycleLoopMenu(direction = 1) {
+    const items = ['play', 'overdub', 'undo', 'clear', 'stop'];
+    const currentIndex = items.indexOf(this.state.loopMenu);
+    const nextIndex = (currentIndex + direction + items.length) % items.length;
+    this.setLoopMenu(items[nextIndex]);
+    return this.state.loopMenu;
+  }
+
+  setBeatEnabled(enabled) {
+    if (this.state.beatEnabled !== enabled) {
+      this.state.beatEnabled = enabled;
+      this.notify(['beatEnabled']);
+    }
+  }
+
+  setBeatPattern(pattern) {
+    if (this.state.beatPattern !== pattern) {
+      this.state.beatPattern = pattern;
+      this.notify(['beatPattern']);
+    }
+  }
+
+  cycleBeatPattern(direction = 1) {
+    const patterns = ['rock', 'house', 'hiphop', 'techno'];
+    const currentIndex = patterns.indexOf(this.state.beatPattern);
+    const nextIndex = (currentIndex + direction + patterns.length) % patterns.length;
+    this.setBeatPattern(patterns[nextIndex]);
+    return this.state.beatPattern;
   }
 }

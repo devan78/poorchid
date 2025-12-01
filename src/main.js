@@ -3,6 +3,7 @@ import { ChordLogic } from './chord-logic';
 import { VoicingEngine } from './voicing-engine';
 import { MidiHandler } from './midi-handler';
 import { Looper } from './looper';
+import { BeatEngine } from './beat-engine';
 import { Arpeggiator, Strummer, PatternPlayer } from './arpeggiator';
 import { PoorchidState } from './state';
 import { PoorchidUI } from './ui';
@@ -35,8 +36,12 @@ export class PoorchidApp {
     this.looper = new Looper(this.audio.ctx, {
       onPlay: (note, vel) => this.audio.playNote(note),
       onStop: (note) => this.stopNoteFromLooper(note),
-      onProgress: (progress) => this.updateLoopProgress(progress)
+      onProgress: (progress, currentBar, totalBars) => this.updateLoopProgress(progress, currentBar, totalBars),
+      onMetronome: (time, isAccent) => this.audio.playClick(time, isAccent)
     });
+
+    this.beatEngine = new BeatEngine(this.audio.ctx);
+    this.beatEngine.output.connect(this.audio.masterGain);
 
     // Initialize arpeggiator with dedicated monophonic voice
     this.arpeggiator = new Arpeggiator(this.audio.ctx, {
@@ -91,6 +96,7 @@ export class PoorchidApp {
       toggleBass: () => this.stateManager.toggleBass(),
       cycleBassMode: () => this.stateManager.cycleBassMode(),
       cyclePatch: (direction) => this.stateManager.cyclePatch(direction),
+      toggleRecording: () => this.toggleRecording(),
       toggleKey: () => this.stateManager.toggleKey(),
       toggleKeyAutoChords: () => this.stateManager.toggleKeyAutoChords(),
       cycleKeyRoot: (direction) => this.stateManager.cycleKeyRoot(direction),
@@ -107,6 +113,12 @@ export class PoorchidApp {
       setBpm: (bpm) => this.stateManager.setBpm(bpm),
       tapTempo: () => this.tapTempo(),
       toggleMetronome: () => this.stateManager.toggleMetronome(),
+      // Beat Engine actions
+      toggleBeatEngine: () => {
+        const enabled = !this.stateManager.get('beatEnabled');
+        this.stateManager.setBeatEnabled(enabled);
+      },
+      cycleBeatPattern: (direction) => this.stateManager.cycleBeatPattern(direction),
       // FX actions
       cycleFxType: () => this.stateManager.cycleCurrentEffect(),
       setFxLevel: (effectName, level) => this.stateManager.setFxLevel(effectName, level),
@@ -115,10 +127,42 @@ export class PoorchidApp {
       // Looper actions
       toggleLoopRecord: () => this.toggleLoopRecord(),
       toggleLoopPlay: () => this.toggleLoopPlay(),
+      loopRecord: () => {
+        if (this.looper.state === 'idle') {
+          const length = this.stateManager.state.loopLength === 'free' ? 0 : this.stateManager.state.loopLength;
+          let startTime = null;
+          if (this.stateManager.state.beatEnabled && length !== 0) {
+             startTime = this.beatEngine.getNextBarTime();
+          }
+          this.looper.record(length, startTime);
+        }
+        this.stateManager.setLooperState(this.looper.state);
+      },
+      loopOverdub: () => {
+        if (this.looper.state === 'playing') this.looper.overdub();
+        this.stateManager.setLooperState(this.looper.state);
+      },
+      loopStop: () => {
+        this.looper.stop();
+        this.stateManager.setLooperState(this.looper.state);
+      },
+      loopClear: () => {
+        this.looper.stop();
+        this.looper.layers = [];
+        this.stateManager.setLooperState(this.looper.state);
+      },
       undoLoop: () => {
         this.looper.undo();
         this.stateManager.setLooperState(this.looper.state);
-      }
+      },
+      cycleLoopEncoder: (direction) => {
+        if (this.looper.state === 'idle') {
+          this.stateManager.cycleLoopLength(direction);
+        } else {
+          this.stateManager.cycleLoopMenu(direction);
+        }
+      },
+      clickLoopEncoder: () => this.handleClickLoopEncoder()
     });
 
     this.init();
@@ -224,7 +268,7 @@ export class PoorchidApp {
   handleStateChange(state, changedProps) {
     // State key validation
     const validKeys = [
-      'powered','root','type','extensions','voicingCenter','filterCutoff','midiConnected','activeMidiNotes','looperState','isPlaying','bassEnabled','bassMode','bassVoicing','bassVolume','volume','flavourEnabled','currentPatch','keyEnabled','keyRoot','keyScale','keyAutoChords','performMode','arpPattern','arpDivision','strumSpeed','rhythmPattern','playstyle','bpm','metronomeOn','currentEffect','fxLocked','fxLevels'
+      'powered','root','type','extensions','voicingCenter','filterCutoff','midiConnected','activeMidiNotes','looperState','isPlaying','bassEnabled','bassMode','bassVoicing','bassVolume','volume','flavourEnabled','currentPatch','keyEnabled','keyRoot','keyScale','keyAutoChords','performMode','arpPattern','arpDivision','arpOctave','strumSpeed','rhythmPattern','playstyle','bpm','metronomeOn','currentEffect','fxLocked','fxLevels','recording'
     ];
     for (const key of changedProps) {
       if (!validKeys.includes(key)) {
@@ -254,12 +298,16 @@ export class PoorchidApp {
       this.arpeggiator.setBpm(state.bpm);
       this.patternPlayer.setBpm(state.bpm);
       this.audio.setFxBpm(state.bpm);
+      this.looper.setBpm(state.bpm);
     }
     if (changedProps.includes('arpPattern')) {
       this.arpeggiator.setPattern(state.arpPattern);
     }
     if (changedProps.includes('arpDivision')) {
       this.arpeggiator.setDivision(state.arpDivision);
+    }
+    if (changedProps.includes('arpOctave')) {
+      this.arpeggiator.setOctaveRange(state.arpOctave);
     }
     if (changedProps.includes('strumSpeed')) {
       this.strummer.setSpeed(state.strumSpeed);
@@ -278,9 +326,13 @@ export class PoorchidApp {
       if (state.performMode !== 'pattern') {
         this.patternPlayer.stop();
       }
-      // Release strummer when switching modes
-      if (state.performMode !== 'strum') {
+      
+      // Handle Strummer modes
+      const strumModes = ['strum', 'strum2', 'slop', 'harp'];
+      if (!strumModes.includes(state.performMode)) {
         this.strummer.release();
+      } else {
+        this.strummer.setMode(state.performMode);
       }
     }
     
@@ -339,6 +391,21 @@ export class PoorchidApp {
         this.playCurrentChord(this.getPlaybackOptions());
       }
     }
+
+    // Beat Engine Updates
+    if (changedProps.includes('beatEnabled')) {
+      if (state.beatEnabled) {
+        this.beatEngine.start();
+      } else {
+        this.beatEngine.stop();
+      }
+    }
+    if (changedProps.includes('beatPattern')) {
+      this.beatEngine.setPattern(state.beatPattern);
+    }
+    if (changedProps.includes('bpm')) {
+      this.beatEngine.setBpm(state.bpm);
+    }
   }
 
   playCurrentChord(options = {}) {
@@ -348,7 +415,8 @@ export class PoorchidApp {
     let chordType = options.overrideType || state.type;
     let forceSingle = !!options.forceSingle;
     // Strum mode should always build chords; ignore single-note forcing here
-    if (state.performMode === 'strum') {
+    const strumModes = ['strum', 'strum2', 'slop', 'harp'];
+    if (strumModes.includes(state.performMode)) {
       forceSingle = false;
     }
 
@@ -380,7 +448,11 @@ export class PoorchidApp {
       // Arpeggiator mode: update notes and start if not running
       this.arpeggiator.updateNotes(voicedNotes);
       if (!this.arpeggiator.isRunning) {
-        this.arpeggiator.start(voicedNotes);
+        let startTime = null;
+        if (state.beatEnabled) {
+           startTime = this.beatEngine.getNextNoteTime();
+        }
+        this.arpeggiator.start(voicedNotes, startTime);
       }
       // Bass still plays normally in arp mode
       if (state.bassEnabled) {
@@ -388,9 +460,10 @@ export class PoorchidApp {
       }
       this.stateManager.setIsPlaying(true);
       return;
-    } else if (state.performMode === 'strum') {
+    } else if (['strum', 'strum2', 'slop', 'harp'].includes(state.performMode)) {
       // Strum mode: play chord with strum effect
       this.strummer.release();
+      this.strummer.setMode(state.performMode);
       this.strummer.strum(voicedNotes);
       if (state.bassEnabled) {
         this.audio.playBass(bassNote);
@@ -401,7 +474,11 @@ export class PoorchidApp {
       // Pattern mode: play notes in rhythmic patterns synced to BPM
       this.patternPlayer.updateNotes(voicedNotes);
       if (!this.patternPlayer.isRunning) {
-        this.patternPlayer.start(voicedNotes);
+        let startTime = null;
+        if (state.beatEnabled) {
+           startTime = this.beatEngine.getNextNoteTime();
+        }
+        this.patternPlayer.start(voicedNotes, startTime);
       }
       // Bass still plays normally in pattern mode
       if (state.bassEnabled) {
@@ -487,9 +564,61 @@ export class PoorchidApp {
     }
   }
 
+  handleClickLoopEncoder() {
+    const state = this.stateManager.state;
+    
+    if (this.looper.state === 'idle') {
+      // Start Recording
+      const length = state.loopLength === 'free' ? 0 : state.loopLength;
+      let startTime = null;
+      if (state.beatEnabled && length !== 0) {
+         startTime = this.beatEngine.getNextBarTime();
+      }
+      this.looper.record(length, startTime);
+    } else if (this.looper.state === 'recording') {
+      // Finish Recording (if free mode)
+      this.looper.play();
+    } else {
+      // Execute Menu Action
+      switch (state.loopMenu) {
+        case 'play':
+          if (this.looper.state !== 'playing') {
+             let startTime = null;
+             if (state.beatEnabled) startTime = this.beatEngine.getNextBarTime();
+             this.looper.play(startTime);
+          }
+          break;
+        case 'overdub':
+          if (this.looper.state === 'playing') this.looper.overdub();
+          else {
+             let startTime = null;
+             if (state.beatEnabled) startTime = this.beatEngine.getNextBarTime();
+             this.looper.play(startTime); // Toggle back to play if overdubbing
+          }
+          break;
+        case 'stop':
+          this.looper.stop();
+          break;
+        case 'undo':
+          this.looper.undo();
+          break;
+        case 'clear':
+          this.looper.stop();
+          this.looper.layers = [];
+          break;
+      }
+    }
+    this.stateManager.setLooperState(this.looper.state);
+  }
+
   toggleLoopRecord() {
     if (this.looper.state === 'idle') {
-      this.looper.record();
+      const length = this.stateManager.state.loopLength === 'free' ? 0 : this.stateManager.state.loopLength;
+      let startTime = null;
+      if (this.stateManager.state.beatEnabled && length !== 0) {
+         startTime = this.beatEngine.getNextBarTime();
+      }
+      this.looper.record(length, startTime);
     } else if (this.looper.state === 'recording') {
       this.looper.play();
     } else if (this.looper.state === 'playing') {
@@ -504,9 +633,48 @@ export class PoorchidApp {
     if (this.looper.state === 'playing' || this.looper.state === 'overdubbing') {
       this.looper.stop();
     } else {
-      this.looper.play();
+      let startTime = null;
+      if (this.stateManager.state.beatEnabled) startTime = this.beatEngine.getNextBarTime();
+      this.looper.play(startTime);
     }
     this.stateManager.setLooperState(this.looper.state);
+  }
+
+  async toggleRecording() {
+    if (!this.audio.isRecordingSupported()) {
+      alert('Recording is not supported in this browser.');
+      return;
+    }
+
+    const isRecording = this.stateManager.get('recording');
+    if (!isRecording) {
+      const started = this.audio.startRecording();
+      if (started) {
+        this.stateManager.setRecording(true);
+      } else {
+        alert('Could not start recording.');
+      }
+    } else {
+      this.stateManager.setRecording(false);
+      const blob = await this.audio.stopRecording();
+      if (blob) {
+        this.saveRecording(blob);
+      }
+    }
+  }
+
+  saveRecording(blob) {
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const ext = blob.type.includes('wav') ? 'wav' : (blob.type.includes('ogg') ? 'ogg' : 'webm');
+    const filename = `poorchid-${timestamp}.${ext}`;
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
   stopNoteFromLooper(note) {
@@ -516,7 +684,7 @@ export class PoorchidApp {
     }
   }
 
-  updateLoopProgress(progress) {
+  updateLoopProgress(progress, currentBar, totalBars) {
     const reel = document.querySelector('.reel-progress');
     if (reel) {
       reel.style.strokeDashoffset = 1 - progress;
@@ -524,6 +692,10 @@ export class PoorchidApp {
       if (reelContainer) {
         reelContainer.style.transform = `rotate(${progress * 360}deg)`;
       }
+    }
+    
+    if (currentBar !== undefined && totalBars !== undefined) {
+      this.stateManager.setLoopBarsRecorded(`${currentBar}/${totalBars}`);
     }
   }
 

@@ -70,6 +70,13 @@ export class Arpeggiator {
   }
   
   /**
+   * Set octave range (1-3)
+   */
+  setOctaveRange(range) {
+    this.octaveRange = Math.max(1, Math.min(3, range));
+  }
+
+  /**
    * Cycle to next division
    */
   cycleDivision(direction = 1) {
@@ -105,7 +112,7 @@ export class Arpeggiator {
   /**
    * Set the notes to arpeggiate
    */
-  setNotes(notes) {
+  setNotes(notes = []) {
     // Sort notes for consistent ordering
     this.currentNotes = [...notes].sort((a, b) => a - b);
     
@@ -229,7 +236,7 @@ export class Arpeggiator {
   /**
    * Start the arpeggiator
    */
-  start(notes = []) {
+  start(notes = [], startTime = null) {
     if (notes.length > 0) {
       this.setNotes(notes);
     }
@@ -239,7 +246,7 @@ export class Arpeggiator {
     this.isRunning = true;
     this.currentIndex = 0;
     this.direction = this.pattern === 'down' || this.pattern === 'downup' ? -1 : 1;
-    this.nextNoteTime = this.ctx.currentTime;
+    this.nextNoteTime = startTime || this.ctx.currentTime;
     
     // Start scheduler
     if (!this.schedulerInterval) {
@@ -481,7 +488,7 @@ export class PatternPlayer {
   /**
    * Start the pattern player
    */
-  start(notes = []) {
+  start(notes = [], startTime = null) {
     if (notes.length > 0) {
       this.setNotes(notes);
     }
@@ -491,7 +498,7 @@ export class PatternPlayer {
     this.isRunning = true;
     this.stepIndex = 0;
     this.noteIndex = 0;
-    this.nextStepTime = this.ctx.currentTime;
+    this.nextStepTime = startTime || this.ctx.currentTime;
     
     if (!this.schedulerInterval) {
       this.schedulerInterval = setInterval(() => this.scheduler(), this.lookahead);
@@ -533,6 +540,7 @@ export class Strummer {
     
     this.strumTime = 50; // ms between notes (0-200)
     this.direction = 'down'; // down = low to high, up = high to low
+    this.mode = 'strum'; // strum, strum2, slop, harp
     this.activeNotes = new Set();
     this.pendingTimers = [];
   }
@@ -551,6 +559,16 @@ export class Strummer {
   setDirection(dir) {
     if (dir === 'down' || dir === 'up') {
       this.direction = dir;
+    }
+  }
+
+  /**
+   * Set strum mode
+   */
+  setMode(mode) {
+    const validModes = ['strum', 'strum2', 'slop', 'harp'];
+    if (validModes.includes(mode)) {
+      this.mode = mode;
     }
   }
   
@@ -572,18 +590,45 @@ export class Strummer {
     // Sort notes
     let sortedNotes = [...notes].sort((a, b) => a - b);
     
-    // Reverse for up strum
-    if (this.direction === 'up') {
+    // Handle extended ranges
+    if (this.mode === 'strum2') {
+      // Add one octave up
+      const extended = [...sortedNotes];
+      sortedNotes.forEach(note => extended.push(note + 12));
+      sortedNotes = extended;
+    } else if (this.mode === 'harp') {
+      // Add two octaves up
+      const extended = [...sortedNotes];
+      sortedNotes.forEach(note => extended.push(note + 12));
+      sortedNotes.forEach(note => extended.push(note + 24));
+      sortedNotes = extended;
+    }
+
+    // Reverse for up strum (Harp is always up)
+    if (this.direction === 'up' && this.mode !== 'harp') {
       sortedNotes.reverse();
     }
     
+    // Determine timing
+    let interval = this.strumTime;
+    if (this.mode === 'harp') {
+      // Harp is always fast
+      interval = Math.min(this.strumTime, 40); 
+    }
+
     // Play each note with increasing delay
     sortedNotes.forEach((note, index) => {
-      const delay = index * this.strumTime;
+      let delay = index * interval;
+      
+      // Add slop (random timing variation)
+      if (this.mode === 'slop') {
+        const jitter = (Math.random() * 30) - 15; // +/- 15ms
+        delay = Math.max(0, delay + jitter);
+      }
       
       const timer = setTimeout(() => {
         // Velocity can decrease slightly for later notes
-        const noteVel = Math.max(60, velocity - (index * 5));
+        const noteVel = Math.max(60, velocity - (index * 2)); // Less drop for longer strums
         this.onNoteOn(note, noteVel);
         this.activeNotes.add(note);
       }, delay);

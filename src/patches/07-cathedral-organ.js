@@ -155,7 +155,7 @@ export const CathedralOrgan = {
       output,
       release(time = 0) {
         const releaseTime = ctx.currentTime + time;
-        const relDuration = 0.08; // Organ releases quickly
+        const relDuration = 0.3; // Longer tail so notes don't choke
         
         ampEnv.gain.cancelScheduledValues(releaseTime);
         ampEnv.gain.setValueAtTime(ampEnv.gain.value, releaseTime);

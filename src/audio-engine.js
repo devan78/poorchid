@@ -111,6 +111,12 @@ export class AudioEngine {
     this.flavourOutput.connect(this.masterGain);
     this.flavourBypassGain.connect(this.masterGain);
     this.masterGain.connect(this.ctx.destination);
+    // Recorder tap point (post-master)
+    this.recordDestination = this.ctx.createMediaStreamDestination();
+    this.masterGain.connect(this.recordDestination);
+    this.mediaRecorder = null;
+    this.recordedChunks = [];
+    this.isRecording = false;
     this.setFlavourEnabled(this.flavourEnabled);
     
     // Global Drift LFO (Tape wobble - enhanced)
@@ -491,6 +497,55 @@ export class AudioEngine {
     this.masterGain.gain.setTargetAtTime(gain, this.ctx.currentTime, 0.02);
   }
 
+  isRecordingSupported() {
+    return typeof MediaRecorder !== 'undefined' && !!this.recordDestination;
+  }
+
+  startRecording() {
+    if (!this.isRecordingSupported() || this.isRecording) return false;
+    try {
+      this.resume();
+      this.recordedChunks = [];
+      const options = {};
+      const preferred = 'audio/webm;codecs=opus';
+      if (MediaRecorder.isTypeSupported(preferred)) {
+        options.mimeType = preferred;
+      } else if (MediaRecorder.isTypeSupported('audio/webm')) {
+        options.mimeType = 'audio/webm';
+      }
+      this.mediaRecorder = new MediaRecorder(this.recordDestination.stream, options);
+      this.mediaRecorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) {
+          this.recordedChunks.push(e.data);
+        }
+      };
+      this.mediaRecorder.start();
+      this.isRecording = true;
+      return true;
+    } catch (e) {
+      console.error('Failed to start recording', e);
+      this.mediaRecorder = null;
+      this.isRecording = false;
+      return false;
+    }
+  }
+
+  async stopRecording() {
+    if (!this.mediaRecorder || !this.isRecording) return null;
+    return new Promise((resolve) => {
+      const recorder = this.mediaRecorder;
+      recorder.onstop = () => {
+        const mimeType = recorder.mimeType || 'audio/webm';
+        const blob = new Blob(this.recordedChunks, { type: mimeType });
+        this.mediaRecorder = null;
+        this.isRecording = false;
+        this.recordedChunks = [];
+        resolve(blob);
+      };
+      recorder.stop();
+    });
+  }
+
   createSaturationCurve(amount = 1) {
     const k = Math.max(0.01, amount) * 12;
     const samples = 1024;
@@ -500,5 +555,22 @@ export class AudioEngine {
       curve[i] = ((1 + k) * x) / (1 + k * Math.abs(x));
     }
     return curve;
+  }
+
+  playClick(time, isAccent) {
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    
+    osc.connect(gain);
+    gain.connect(this.masterGain);
+    
+    osc.frequency.value = isAccent ? 1200 : 800;
+    osc.type = 'square';
+    
+    gain.gain.setValueAtTime(0.3, time);
+    gain.gain.exponentialRampToValueAtTime(0.001, time + 0.05);
+    
+    osc.start(time);
+    osc.stop(time + 0.05);
   }
 }
