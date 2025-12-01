@@ -740,7 +740,7 @@ export class PoorchidApp {
     
     // If root didn't change, we still need to trigger playback
     if (!rootChanged) {
-      this.playCurrentChord();
+      this.playCurrentChord(this.getPlaybackOptions());
     }
     
     this.setKeyPressed(noteName, true);
