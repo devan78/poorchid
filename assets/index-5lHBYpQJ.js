@@ -136,7 +136,7 @@ var U=Object.defineProperty;var Y=(o,e,t)=>e in o?U(o,e,{enumerable:!0,configura
               <button class="perf-btn" data-type="suspended" id="btn-sus">Sus<span class="key-hint">F</span></button>
             </div>
             <div class="button-row">
-              <button class="perf-btn" data-ext="6" id="btn-6">6<span class="key-hint"></span></button>
+              <button class="perf-btn" data-ext="6" id="btn-6">6<span class="key-hint">\\</span></button>
               <button class="perf-btn" data-ext="7" id="btn-m7">m7<span class="key-hint">Z</span></button>
               <button class="perf-btn" data-ext="maj7" id="btn-M7">M7<span class="key-hint">X</span></button>
               <button class="perf-btn" data-ext="9" id="btn-9">9<span class="key-hint">C</span></button>
