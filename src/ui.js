@@ -285,14 +285,19 @@ export class PoorchidUI {
       oledPatch.textContent = this.getPatchDisplayName(state.currentPatch);
     }
 
-    const oledMain = this.container.querySelector('.oled-main-text');
-    if (oledMain) {
-      oledMain.textContent = `${state.root} ${state.type}`;
+    const oledRoot = this.container.querySelector('.oled-chord-root');
+    if (oledRoot) {
+      oledRoot.textContent = state.root;
     }
 
-    const oledSub = this.container.querySelector('.oled-sub-text');
-    if (oledSub) {
-      oledSub.textContent = state.extensions.size > 0 ? Array.from(state.extensions).join(' ') : 'No extensions';
+    const oledType = this.container.querySelector('.oled-chord-type');
+    if (oledType) {
+      oledType.textContent = state.type;
+    }
+
+    const oledExt = this.container.querySelector('.oled-extensions');
+    if (oledExt) {
+      oledExt.textContent = state.extensions.size > 0 ? Array.from(state.extensions).join(' ') : '—';
     }
 
     // OLED Volume display (top right)
