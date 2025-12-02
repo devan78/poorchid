@@ -267,10 +267,18 @@ export class PoorchidApp {
     const playstyle = this.stateManager.get('playstyle');
     const hasHeldNotes = this.stateManager.state.activeMidiNotes.size > 0;
 
-    if (playstyle === 'free' && hasHeldNotes) {
-      this.playstyleForceSingle = true;
-      this.playstyleOverrideType = null;
-      this.playCurrentChord({ forceSingle: true });
+    if (hasHeldNotes) {
+      if (playstyle === 'free' || playstyle === 'advanced') {
+        // Revert to stored state type (no override)
+        this.playstyleForceSingle = false;
+        this.playstyleOverrideType = null;
+        this.playCurrentChord({ forceSingle: false });
+      } else if (playstyle === 'simple') {
+        // Revert to single note
+        this.playstyleForceSingle = true;
+        this.playstyleOverrideType = null;
+        this.playCurrentChord({ forceSingle: true });
+      }
     }
   }
 
@@ -749,7 +757,8 @@ export class PoorchidApp {
     const keyChordActive = this.stateManager.get('keyEnabled') && this.stateManager.get('keyAutoChords');
     const chordHeld = !!this.heldChordType;
 
-    let useChord = keyChordActive || (playstyle === 'simple' ? chordHeld : chordHeld);
+    // In simple mode, only play chord if button held. In advanced/free, default to chord.
+    let useChord = keyChordActive || (playstyle === 'simple' ? chordHeld : true);
     let overrideType = chordHeld ? this.heldChordType : null;
 
     // Free mode reverts when button released; advanced keeps chord once engaged via button
