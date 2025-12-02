@@ -230,8 +230,8 @@ export class PoorchidUI {
       return 'DIRECT';
     } else if (state.performMode === 'arp') {
       return `ARP ${state.arpPattern.toUpperCase()} ${state.arpDivision}`;
-    } else if (state.performMode === 'strum') {
-      return `STRUM ${state.strumSpeed}`;
+    } else if (['strum', 'strum2', 'slop', 'harp'].includes(state.performMode)) {
+      return `${state.performMode.toUpperCase()} ${state.strumSpeed}`;
     } else if (state.performMode === 'pattern') {
       const patternNames = {
         'straight': 'STRAIGHT',
@@ -433,7 +433,7 @@ export class PoorchidUI {
         const divisions = ['1/1', '1/2', '1/4', '1/8', '1/16', '1/32', '1/4T', '1/8T', '1/16T'];
         const index = divisions.indexOf(state.arpDivision);
         if (index !== -1) this._currentPerformValue = Math.round((index * 11) + 5);
-      } else if (state.performMode === 'strum') {
+      } else if (['strum', 'strum2', 'slop', 'harp'].includes(state.performMode)) {
         this._currentPerformValue = state.strumSpeed;
       } else if (state.performMode === 'pattern') {
         const patterns = ['straight', 'offbeat', 'pulse', 'tresillo', 'clave', 'shuffle', 'waltz', 'funk'];

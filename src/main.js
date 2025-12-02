@@ -868,7 +868,7 @@ export class PoorchidApp {
       const divisions = ['1/1', '1/2', '1/4', '1/8', '1/16', '1/32', '1/4T', '1/8T', '1/16T'];
       const index = Math.min(8, Math.floor(value / 11)); // 0-10=0, 11-21=1, etc.
       this.stateManager.setArpDivision(divisions[index]);
-    } else if (mode === 'strum') {
+    } else if (['strum', 'strum2', 'slop', 'harp'].includes(mode)) {
       this.stateManager.setStrumSpeed(value);
       this.strummer.setSpeed(value);
     } else if (mode === 'pattern') {

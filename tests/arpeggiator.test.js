@@ -177,6 +177,26 @@ describe('Strummer', () => {
     });
   });
 
+  describe('Modes', () => {
+    it('should have default mode of strum', () => {
+      expect(strummer.mode).toBe('strum');
+    });
+
+    it('should set valid modes', () => {
+      strummer.setMode('strum2');
+      expect(strummer.mode).toBe('strum2');
+      strummer.setMode('slop');
+      expect(strummer.mode).toBe('slop');
+      strummer.setMode('harp');
+      expect(strummer.mode).toBe('harp');
+    });
+
+    it('should ignore invalid modes', () => {
+      strummer.setMode('invalid');
+      expect(strummer.mode).toBe('strum');
+    });
+  });
+
   describe('Strum', () => {
     it('should track active notes during strum', () => {
       vi.useFakeTimers();
