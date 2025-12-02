@@ -126,4 +126,24 @@ describe('PoorchidApp Integration', () => {
     window.dispatchEvent(new KeyboardEvent('keyup', { key: 'w' }));
     expect(app.state.extensions.has('7')).toBe(false);
   });
+
+  it('should respect MIDI octave', () => {
+    // C3 (48)
+    app.handleMidiNoteOn(48, 100);
+    
+    // Expect playChord to be called
+    expect(app.audio.playChord).toHaveBeenCalled();
+    
+    // Get the notes passed to playChord
+    const calledArgs = app.audio.playChord.mock.calls[0][0];
+    
+    // Default C4 (60) major: [60, 64, 67]
+    // C3 (48) major: [48, 52, 55]
+    // With octave tracking, the voicing center should shift down to 48
+    // So the resulting notes should be centered around 48
+    const avg = calledArgs.reduce((a, b) => a + b, 0) / calledArgs.length;
+    
+    // Should be significantly lower than C4 (60)
+    expect(avg).toBeLessThan(55); 
+  });
 });

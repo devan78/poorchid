@@ -412,6 +412,26 @@ export class PoorchidApp {
     const state = this.stateManager.state;
 
     let root = state.root;
+    
+    // Determine octave offset from active MIDI notes
+    let octaveOffset = 0;
+    if (state.activeMidiNotes.size > 0) {
+      const notes = Array.from(state.activeMidiNotes);
+      let matchingNote = null;
+      // Find the most recent note that matches the current root
+      for (let i = notes.length - 1; i >= 0; i--) {
+        if (this.logic.getNoteName(notes[i]) === state.root) {
+          matchingNote = notes[i];
+          break;
+        }
+      }
+      
+      if (matchingNote !== null) {
+        const defaultMidi = this.logic.getMidiRoot(state.root);
+        octaveOffset = matchingNote - defaultMidi;
+      }
+    }
+
     let chordType = options.overrideType || state.type;
     let forceSingle = !!options.forceSingle;
     // Strum mode should always build chords; ignore single-note forcing here
@@ -437,11 +457,13 @@ export class PoorchidApp {
       );
 
     // 2. Apply voicing
-    const voicedNotes = this.voicing.getVoicing(baseNotes, state.voicingCenter);
+    // Shift voicing center by the played octave offset
+    const effectiveCenter = Math.max(0, Math.min(127, state.voicingCenter + octaveOffset));
+    const voicedNotes = this.voicing.getVoicing(baseNotes, effectiveCenter);
 
-    // 3. Calculate bass note (root - 2 octaves + voicing offset)
+    // 3. Calculate bass note (root - 2 octaves + voicing offset + played octave)
     const rootMidi = this.logic.getMidiRoot(state.root);
-    const bassNote = rootMidi - 24 + state.bassVoicing;
+    const bassNote = rootMidi + octaveOffset - 24 + state.bassVoicing;
 
     // 4. Handle performance mode
     if (state.performMode === 'arp') {
