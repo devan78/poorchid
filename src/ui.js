@@ -1,4 +1,5 @@
 import { PATCHES } from './patch-manager.js';
+import { KEY_MAP } from './constants.js';
 
 const ENCODER_TYPES = {
   volume: { type: 'scoped', min: 0, max: 99 },
@@ -629,11 +630,27 @@ export class PoorchidUI {
       { note: 'B', type: 'white' },
     ];
 
+    // Create reverse map for display
+    const noteToKey = {};
+    Object.entries(KEY_MAP).forEach(([k, n]) => {
+      noteToKey[n] = k;
+    });
+
     const keyboardEl = document.getElementById('keyboard');
     if (keyboardEl) {
-      keyboardEl.innerHTML = keys.map(k => `
-        <div class="key ${k.type}" data-note="${k.note}"></div>
-      `).join('');
+      keyboardEl.innerHTML = keys.map(k => {
+        const keyLabel = noteToKey[k.note] || '';
+        const displayLabel = keyLabel === ';' ? ';' : 
+                             keyLabel === '\'' ? '\'' : 
+                             keyLabel === '[' ? '[' : 
+                             keyLabel === ']' ? ']' : 
+                             keyLabel.toUpperCase();
+        
+        return `
+        <div class="key ${k.type}" data-note="${k.note}">
+          <span class="key-label">${displayLabel}</span>
+        </div>
+      `}).join('');
     }
   }
 

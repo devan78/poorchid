@@ -1340,7 +1340,21 @@ input[type=range]::-webkit-slider-thumb:hover {
 }
 
 .key-label {
-  display: none;
+  position: absolute;
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 10px;
+  color: rgba(0,0,0,0.25);
+  pointer-events: none;
+  font-family: monospace;
+  font-weight: bold;
+  user-select: none;
+}
+
+.key.black .key-label {
+  color: rgba(255,255,255,0.25);
+  bottom: 6px;
 }
 
 /* Loading State */

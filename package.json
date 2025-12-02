@@ -1,6 +1,6 @@
 {
   "name": "poorchid",
-  "version": "0.1.18",
+  "version": "0.1.19",
   "description": "The poor man's Orchid - Open source chord synthesizer",
   "type": "module",
   "scripts": {
