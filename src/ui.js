@@ -661,6 +661,13 @@ export class PoorchidUI {
       if (typeBtn && (typeBtn.classList.contains('perf-btn') || typeBtn.closest('#type-controls'))) {
         e.preventDefault();
         this.actions.pressChordType(typeBtn.dataset.type);
+        return;
+      }
+
+      const key = e.target.closest('.key');
+      if (key) {
+        e.preventDefault();
+        this.actions.playNote(key.dataset.note);
       }
     });
 
@@ -669,6 +676,21 @@ export class PoorchidUI {
       if (typeBtn && (typeBtn.classList.contains('perf-btn') || typeBtn.closest('#type-controls'))) {
         e.preventDefault();
         this.actions.releaseChordType(typeBtn.dataset.type);
+        return;
+      }
+
+      const key = e.target.closest('.key');
+      if (key) {
+        e.preventDefault();
+        this.actions.stopNote(key.dataset.note);
+      }
+    });
+
+    this.container.addEventListener('pointerout', (e) => {
+      const key = e.target.closest('.key');
+      if (key) {
+        e.preventDefault();
+        this.actions.stopNote(key.dataset.note);
       }
     });
 
@@ -849,11 +871,6 @@ export class PoorchidUI {
       // Performance buttons - extensions
       if (target.classList.contains('perf-btn') && target.dataset.ext) {
         this.actions.toggleExtension(target.dataset.ext);
-      }
-
-      if (target.classList.contains('key')) {
-        const note = target.dataset.note;
-        this.actions.setRoot(note);
       }
 
       if (target.id === 'loop-rec-btn') this.actions.toggleLoopRecord();

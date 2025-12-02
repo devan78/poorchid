@@ -105,6 +105,15 @@ export class PoorchidApp {
       cyclePlaystyle: () => this.stateManager.cyclePlaystyle(),
       pressChordType: (type) => this.handleChordTypePress(type),
       releaseChordType: (type) => this.handleChordTypeRelease(type),
+      // Note actions for GUI keyboard
+      playNote: (noteName) => {
+        const midiNote = this.logic.getMidiRoot(noteName);
+        this.handleMidiNoteOn(midiNote, 100);
+      },
+      stopNote: (noteName) => {
+        const midiNote = this.logic.getMidiRoot(noteName);
+        this.handleMidiNoteOff(midiNote);
+      },
       // Performance mode actions
       cyclePerformMode: () => this.stateManager.cyclePerformMode(),
       cycleArpPattern: () => this.stateManager.cycleArpPattern(),
@@ -457,7 +466,7 @@ export class PoorchidApp {
       );
 
     // 2. Apply voicing
-    // Shift voicing center by the played octave offset
+    // Shift voicing center to match the played octave
     const effectiveCenter = Math.max(0, Math.min(127, state.voicingCenter + octaveOffset));
     const voicedNotes = this.voicing.getVoicing(baseNotes, effectiveCenter);
 

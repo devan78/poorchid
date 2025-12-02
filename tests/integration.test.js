@@ -78,9 +78,9 @@ describe('PoorchidApp Integration', () => {
 
   it('should change root note', () => {
     const dKey = container.querySelector('.key[data-note="D"]');
-    dKey.click();
+    dKey.dispatchEvent(new Event('pointerdown', { bubbles: true }));
     expect(app.state.root).toBe('D');
-    // Keys no longer show persistent active state - only transient pressed state while held
+    dKey.dispatchEvent(new Event('pointerup', { bubbles: true }));
   });
 
   it('should toggle extensions', () => {
