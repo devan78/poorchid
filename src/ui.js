@@ -96,7 +96,7 @@ export class PoorchidUI {
               </div>
               <div class="oled-grid-cell">
                 <span class="oled-label">BASS</span>
-                <span class="oled-value oled-bass-value ${state.bassEnabled ? 'active' : ''}">${state.bassEnabled ? state.bassMode.toUpperCase() : 'OFF'}</span>
+                <span class="oled-value oled-bass-value ${(state.bassEnabled && state.bassMode !== 'direct') ? 'active' : ''}">${(state.bassEnabled && state.bassMode !== 'direct') ? state.bassMode.toUpperCase() : 'OFF'}</span>
               </div>
 
               <!-- Row 2: Perform & BPM -->
@@ -228,7 +228,7 @@ export class PoorchidUI {
 
   getPerformModeDisplay(state) {
     if (state.performMode === 'direct') {
-      return 'DIRECT';
+      return 'OFF';
     } else if (state.performMode === 'arp') {
       return `ARP ${state.arpPattern.toUpperCase()} ${state.arpDivision}`;
     } else if (['strum', 'strum2', 'slop', 'harp'].includes(state.performMode)) {
@@ -266,7 +266,7 @@ export class PoorchidUI {
   getFxDisplay(state) {
     const effect = state.currentEffect || 'reverb';
     const fxName = effect.toUpperCase();
-    if (effect === 'direct') return 'FX DIRECT';
+    if (effect === 'direct') return 'FX OFF';
     return `FX ${fxName}`;
   }
 
@@ -352,8 +352,9 @@ export class PoorchidUI {
     // Bass mode display
     const bassDisplay = this.container.querySelector('.oled-bass-value');
     if (bassDisplay) {
-      bassDisplay.textContent = state.bassEnabled ? state.bassMode.toUpperCase() : 'OFF';
-      bassDisplay.classList.toggle('active', state.bassEnabled);
+      const isDirect = state.bassMode === 'direct';
+      bassDisplay.textContent = (state.bassEnabled && !isDirect) ? state.bassMode.toUpperCase() : 'OFF';
+      bassDisplay.classList.toggle('active', state.bassEnabled && !isDirect);
     }
 
     // Key mode display
