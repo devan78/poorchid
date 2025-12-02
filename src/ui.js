@@ -655,6 +655,8 @@ export class PoorchidUI {
     
     let volumeHeld = false;
 
+    let lastPlayedKey = null;
+
     // Chord type press/release handling (for playstyle behaviors)
     this.container.addEventListener('pointerdown', (e) => {
       const typeBtn = e.target.closest('[data-type]');
@@ -667,7 +669,28 @@ export class PoorchidUI {
       const key = e.target.closest('.key');
       if (key) {
         e.preventDefault();
-        this.actions.playNote(key.dataset.note);
+        // Release capture to allow sliding over keys
+        if (key.hasPointerCapture && key.hasPointerCapture(e.pointerId)) {
+          key.releasePointerCapture(e.pointerId);
+        }
+        const note = key.dataset.note;
+        if (lastPlayedKey !== note) {
+          this.actions.playNote(note);
+          lastPlayedKey = note;
+        }
+      }
+    });
+
+    this.container.addEventListener('pointerover', (e) => {
+      if (e.buttons === 1) {
+        const key = e.target.closest('.key');
+        if (key) {
+          const note = key.dataset.note;
+          if (lastPlayedKey !== note) {
+            this.actions.playNote(note);
+            lastPlayedKey = note;
+          }
+        }
       }
     });
 
@@ -683,6 +706,9 @@ export class PoorchidUI {
       if (key) {
         e.preventDefault();
         this.actions.stopNote(key.dataset.note);
+        if (lastPlayedKey === key.dataset.note) {
+          lastPlayedKey = null;
+        }
       }
     });
 
@@ -690,7 +716,13 @@ export class PoorchidUI {
       const key = e.target.closest('.key');
       if (key) {
         e.preventDefault();
+        // Avoid stopping if moving to a child element
+        if (key.contains(e.relatedTarget)) return;
+        
         this.actions.stopNote(key.dataset.note);
+        if (lastPlayedKey === key.dataset.note) {
+          lastPlayedKey = null;
+        }
       }
     });
 
