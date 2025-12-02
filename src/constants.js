@@ -23,17 +23,17 @@ export const MIDI_EXTENSION_MAP = {
 };
 
 export const EXTENSION_KEY_MAP = {
-  'q': '6',
-  'w': '7',
-  'e': 'maj7',
-  'r': '9'
+  '\\': '6',
+  'z': '7',
+  'x': 'maj7',
+  'c': '9'
 };
 
 export const TYPE_KEY_MAP = {
-  'a': 'major',
+  'a': 'diminished',
   's': 'minor',
-  'd': 'suspended',
-  'f': 'diminished'
+  'd': 'major',
+  'f': 'suspended'
 };
 
 export const VOICING_KEY_MAP = {

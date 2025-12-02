@@ -163,16 +163,16 @@ export class PoorchidUI {
         <div class="performance-controls">
           <div class="button-grid">
             <div class="button-row">
-              <button class="perf-btn" data-type="diminished" id="btn-dim">Dim</button>
-              <button class="perf-btn" data-type="minor" id="btn-min">Min</button>
-              <button class="perf-btn" data-type="major" id="btn-maj">Maj</button>
-              <button class="perf-btn" data-type="suspended" id="btn-sus">Sus</button>
+              <button class="perf-btn" data-type="diminished" id="btn-dim">Dim<span class="key-hint">A</span></button>
+              <button class="perf-btn" data-type="minor" id="btn-min">Min<span class="key-hint">S</span></button>
+              <button class="perf-btn" data-type="major" id="btn-maj">Maj<span class="key-hint">D</span></button>
+              <button class="perf-btn" data-type="suspended" id="btn-sus">Sus<span class="key-hint">F</span></button>
             </div>
             <div class="button-row">
-              <button class="perf-btn" data-ext="6" id="btn-6">6</button>
-              <button class="perf-btn" data-ext="7" id="btn-m7">m7</button>
-              <button class="perf-btn" data-ext="maj7" id="btn-M7">M7</button>
-              <button class="perf-btn" data-ext="9" id="btn-9">9</button>
+              <button class="perf-btn" data-ext="6" id="btn-6">6<span class="key-hint">\</span></button>
+              <button class="perf-btn" data-ext="7" id="btn-m7">m7<span class="key-hint">Z</span></button>
+              <button class="perf-btn" data-ext="maj7" id="btn-M7">M7<span class="key-hint">X</span></button>
+              <button class="perf-btn" data-ext="9" id="btn-9">9<span class="key-hint">C</span></button>
             </div>
           </div>
 
