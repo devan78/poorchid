@@ -48,7 +48,7 @@ export class PoorchidUI {
       <div class="config-row">
         <!-- Left Encoders -->
         <div class="encoder-group left-encoders">
-          <div class="encoder yellow" data-encoder="sound">
+          <div class="encoder yellow" data-encoder="sound" title="Rotate to browse sound patches">
             <div class="encoder-knob">
               <div class="encoder-indicator"></div>
             </div>
@@ -60,7 +60,7 @@ export class PoorchidUI {
             </div>
             <span class="encoder-label">Perform</span>
           </div>
-          <div class="encoder yellow" data-encoder="fx">
+          <div class="encoder yellow" data-encoder="fx" title="Click to cycle effect, rotate for amount, Shift+click to lock">
             <div class="encoder-knob">
               <div class="encoder-indicator"></div>
             </div>
@@ -144,7 +144,7 @@ export class PoorchidUI {
             </div>
             <span class="encoder-label">Bass</span>
           </div>
-          <div class="encoder charcoal" data-encoder="loop">
+          <div class="encoder charcoal" data-encoder="loop" title="Click to record/play/overdub the looper, hold to stop, rotate for length">
             <div class="encoder-knob">
               <div class="encoder-indicator"></div>
             </div>
@@ -156,13 +156,13 @@ export class PoorchidUI {
             </div>
             <span class="encoder-label">BPM</span>
           </div>
-          <div class="encoder charcoal" data-encoder="options">
+          <div class="encoder charcoal" data-encoder="options" title="Rotate to change play style (simple / advanced / free)">
             <div class="encoder-knob">
               <div class="encoder-indicator"></div>
             </div>
             <span class="encoder-label">Options</span>
           </div>
-          <div class="encoder charcoal" data-encoder="volume">
+          <div class="encoder charcoal" data-encoder="volume" title="Rotate for master volume, Shift+drag for bass volume">
             <div class="encoder-knob" style="transform: rotate(${encoderAngle(state.volume)}deg)">
               <div class="encoder-indicator"></div>
             </div>
@@ -176,13 +176,14 @@ export class PoorchidUI {
         <!-- Left: Chord Type & Extensions -->
         <div class="performance-controls">
           <div class="button-grid">
-            <div class="button-row">
+            <div class="button-row" title="Chord type — hold while playing to apply">
+
               <button class="perf-btn" data-type="diminished" id="btn-dim">Dim<span class="key-hint">A</span></button>
               <button class="perf-btn" data-type="minor" id="btn-min">Min<span class="key-hint">S</span></button>
               <button class="perf-btn" data-type="major" id="btn-maj">Maj<span class="key-hint">D</span></button>
               <button class="perf-btn" data-type="suspended" id="btn-sus">Sus<span class="key-hint">F</span></button>
             </div>
-            <div class="button-row">
+            <div class="button-row" title="Extensions — toggle to add colour to the chord">
               <button class="perf-btn" data-ext="6" id="btn-6">6<span class="key-hint">\</span></button>
               <button class="perf-btn" data-ext="7" id="btn-m7">m7<span class="key-hint">Z</span></button>
               <button class="perf-btn" data-ext="maj7" id="btn-M7">M7<span class="key-hint">X</span></button>
@@ -192,13 +193,13 @@ export class PoorchidUI {
 
           <!-- Voicing & Bass Dials -->
           <div class="dial-stack">
-            <div class="stacked-dial voicing-dial">
+            <div class="stacked-dial voicing-dial" title="Drag to shift the chord's voicing up/down the register">
               <div class="dial-knob" id="voicing-knob" data-value="60">
                 <div class="dial-indicator"></div>
               </div>
               <span class="dial-label">Voicing</span>
             </div>
-            <div class="stacked-dial bass-dial">
+            <div class="stacked-dial bass-dial" title="Drag to set the bass octave offset">
               <div class="dial-knob small" id="bass-knob" data-value="0">
                 <div class="dial-indicator"></div>
               </div>
@@ -264,7 +265,7 @@ export class PoorchidUI {
   }
 
   getKeyDisplay(state) {
-    if (!state.keyEnabled) return 'KEY: OFF';
+    if (!state.keyEnabled) return 'OFF';
     const label = state.keyAutoChords
       ? state.keyScale.toUpperCase().slice(0, 3)
       : ({
@@ -279,9 +280,8 @@ export class PoorchidUI {
 
   getFxDisplay(state) {
     const effect = state.currentEffect || 'reverb';
-    const fxName = effect.toUpperCase();
-    if (effect === 'direct') return 'FX OFF';
-    return `FX ${fxName}`;
+    if (effect === 'direct') return 'OFF';
+    return effect.toUpperCase();
   }
 
   getFxLevel(state) {
