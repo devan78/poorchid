@@ -116,14 +116,14 @@ describe('PoorchidApp Integration', () => {
     app.state.activeMidiNotes.add(60); 
     app.state.isPlaying = true; // Simulate playing state
     
-    // Press 'W' (mapped to '7')
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'w' }));
-    
+    // Press 'Z' (mapped to '7' in EXTENSION_KEY_MAP)
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'z' }));
+
     expect(app.state.extensions.has('7')).toBe(true);
     expect(app.audio.playChord).toHaveBeenCalled();
-    
-    // Release 'W'
-    window.dispatchEvent(new KeyboardEvent('keyup', { key: 'w' }));
+
+    // Release 'Z'
+    window.dispatchEvent(new KeyboardEvent('keyup', { key: 'z' }));
     expect(app.state.extensions.has('7')).toBe(false);
   });
 

@@ -1,6 +1,20 @@
 import { PATCHES } from './patch-manager.js';
 import { KEY_MAP } from './constants.js';
 
+// --- UI interaction constants ---
+export const LONG_PRESS_MS = 500;        // hold time that triggers an encoder's secondary action
+export const FLASH_MS = 1200;            // how long the OLED shows a transient value (e.g. bass volume)
+export const ENCODER_ARC_DEG = 270;      // total sweep of a scoped encoder knob
+const ENCODER_HALF_ARC = ENCODER_ARC_DEG / 2;
+
+/**
+ * Map a scoped value (default 0-99) to a knob rotation in degrees, centered at 0.
+ * Replaces the `(value / 99) * 270 - 135` expression repeated across the UI.
+ */
+export function encoderAngle(value, max = 99) {
+  return (value / max) * ENCODER_ARC_DEG - ENCODER_HALF_ARC;
+}
+
 const ENCODER_TYPES = {
   volume: { type: 'scoped', min: 0, max: 99 },
   bass: { type: 'scoped', min: 0, max: 99 },
@@ -149,7 +163,7 @@ export class PoorchidUI {
             <span class="encoder-label">Options</span>
           </div>
           <div class="encoder charcoal" data-encoder="volume">
-            <div class="encoder-knob" style="transform: rotate(${(state.volume / 99) * 270 - 135}deg)">
+            <div class="encoder-knob" style="transform: rotate(${encoderAngle(state.volume)}deg)">
               <div class="encoder-indicator"></div>
             </div>
             <span class="encoder-label">Volume</span>
@@ -214,7 +228,7 @@ export class PoorchidUI {
     const max = 84;
     const clamped = Math.max(min, Math.min(max, voicingCenter || 60));
     const t = (clamped - min) / (max - min);
-    return t * 270 - 135;
+    return encoderAngle(t, 1);
   }
 
   getBassVoicingRotation(bassVoicing) {
@@ -223,7 +237,7 @@ export class PoorchidUI {
     const max = 24;
     const clamped = Math.max(min, Math.min(max, bassVoicing || 0));
     const t = (clamped - min) / (max - min);
-    return t * 270 - 135;
+    return encoderAngle(t, 1);
   }
 
   getPerformModeDisplay(state) {
@@ -450,7 +464,7 @@ export class PoorchidUI {
 
       const knob = performEncoder.querySelector('.encoder-knob');
       if (knob) {
-        const rotation = engaged ? (this._currentPerformValue / 99) * 270 - 135 : 0;
+        const rotation = engaged ? encoderAngle(this._currentPerformValue) : 0;
         knob.style.transform = `rotate(${rotation}deg)`;
       }
     }
@@ -463,7 +477,7 @@ export class PoorchidUI {
       const knob = fxEncoder.querySelector('.encoder-knob');
       if (knob) {
         this._currentFxValue = state.fxLevels[state.currentEffect] ?? 0;
-        const rotation = engaged ? (this._currentFxValue / 99) * 270 - 135 : 0;
+        const rotation = engaged ? encoderAngle(this._currentFxValue) : 0;
         knob.style.transform = `rotate(${rotation}deg)`;
       }
     }
@@ -485,7 +499,7 @@ export class PoorchidUI {
       bassEncoder.classList.toggle('active', engaged);
       const knob = bassEncoder.querySelector('.encoder-knob');
       if (knob) {
-        const rotation = engaged ? (state.bassVolume / 99) * 270 - 135 : 0;
+        const rotation = engaged ? encoderAngle(state.bassVolume) : 0;
         knob.style.transform = `rotate(${rotation}deg)`;
       }
       // Keep internal tracking in sync
@@ -498,7 +512,7 @@ export class PoorchidUI {
       const knob = volumeEncoder.querySelector('.encoder-knob');
       if (knob) {
         const engaged = this.encoderEngaged.get('volume') === true;
-        const rotation = engaged ? (state.volume / 99) * 270 - 135 : 0;
+        const rotation = engaged ? encoderAngle(state.volume) : 0;
         knob.style.transform = `rotate(${rotation}deg)`;
       }
       // Keep internal tracking in sync
@@ -756,7 +770,7 @@ export class PoorchidUI {
         bassLongPressTimer = setTimeout(() => {
           bassWasLongPress = true;
           this.actions.cycleBassMode();
-        }, 500); // 500ms for long press
+        }, LONG_PRESS_MS); // long press
       }
 
       const keyEncoder = e.target.closest('.encoder[data-encoder="key"]');
@@ -765,7 +779,7 @@ export class PoorchidUI {
         keyLongPressTimer = setTimeout(() => {
           keyWasLongPress = true;
           this.actions.cycleKeyScale();
-        }, 500); // 500ms for long press = cycle scale type
+        }, LONG_PRESS_MS); // long press = cycle scale type
       }
 
       const performEncoder = e.target.closest('.encoder[data-encoder="perform"]');
@@ -774,7 +788,7 @@ export class PoorchidUI {
         performLongPressTimer = setTimeout(() => {
           performWasLongPress = true;
           this.actions.cycleArpPattern(); // Long press = cycle arp pattern
-        }, 500);
+        }, LONG_PRESS_MS);
       }
 
       const bpmEncoder = e.target.closest('.encoder[data-encoder="bpm"]');
@@ -783,7 +797,7 @@ export class PoorchidUI {
         bpmLongPressTimer = setTimeout(() => {
           bpmWasLongPress = true;
           this.actions.toggleMetronome(); // Long press = toggle metronome
-        }, 500);
+        }, LONG_PRESS_MS);
       }
 
       const loopEncoder = e.target.closest('.encoder[data-encoder="loop"]');
@@ -792,7 +806,7 @@ export class PoorchidUI {
         loopLongPressTimer = setTimeout(() => {
           loopWasLongPress = true;
           this.actions.loopStop(); // Long press = Stop
-        }, 500);
+        }, LONG_PRESS_MS);
       }
     });
 
@@ -961,9 +975,9 @@ export class PoorchidUI {
             const newBass = clamp(this._currentBassVolume + delta * step, 0, 99);
             if (newBass !== this._currentBassVolume) {
               this._currentBassVolume = newBass;
-              this._bassVolumeFlashUntil = Date.now() + 1200;
+              this._bassVolumeFlashUntil = Date.now() + FLASH_MS;
               this.actions.setBassVolume(this._currentBassVolume);
-              const rotation = (this._currentBassVolume / 99) * 270 - 135;
+              const rotation = encoderAngle(this._currentBassVolume);
               const knob = encoder.querySelector('.encoder-knob');
               if (knob) {
                 knob.style.transform = `rotate(${rotation}deg)`;
@@ -983,7 +997,7 @@ export class PoorchidUI {
               this.actions.setVolume(this._currentVolume);
               
               // Map volume 0-99 to rotation -135 to +135 degrees (270° sweep)
-              const rotation = (this._currentVolume / 99) * 270 - 135;
+              const rotation = encoderAngle(this._currentVolume);
               const knob = encoder.querySelector('.encoder-knob');
               if (knob) {
                 knob.style.transform = `rotate(${rotation}deg)`;
@@ -1000,11 +1014,11 @@ export class PoorchidUI {
         
         if (newVolume !== this._currentBassVolume) {
           this._currentBassVolume = newVolume;
-          this._bassVolumeFlashUntil = Date.now() + 1200;
+          this._bassVolumeFlashUntil = Date.now() + FLASH_MS;
           this.actions.setBassVolume(this._currentBassVolume);
           
           // Map volume 0-99 to rotation -135 to +135 degrees (270° sweep)
-          const rotation = (this._currentBassVolume / 99) * 270 - 135;
+          const rotation = encoderAngle(this._currentBassVolume);
           const knob = encoder.querySelector('.encoder-knob');
           if (knob) {
             knob.style.transform = `rotate(${rotation}deg)`;
@@ -1029,7 +1043,7 @@ export class PoorchidUI {
             }
             const knob = encoder.querySelector('.encoder-knob');
             if (knob) {
-              const rotation = (this._currentFxValue / 99) * 270 - 135;
+              const rotation = encoderAngle(this._currentFxValue);
               knob.style.transform = `rotate(${rotation}deg)`;
             }
             const fxDisplay = this.container.querySelector('.oled-fx-value');
@@ -1057,7 +1071,7 @@ export class PoorchidUI {
           this.actions.setPerformValue(this._currentPerformValue);
           
           // Map 0-99 to rotation -135 to +135 degrees (270° sweep)
-          const rotation = (this._currentPerformValue / 99) * 270 - 135;
+          const rotation = encoderAngle(this._currentPerformValue);
           const knob = encoder.querySelector('.encoder-knob');
           if (knob) {
             knob.style.transform = `rotate(${rotation}deg)`;
@@ -1095,7 +1109,7 @@ export class PoorchidUI {
           this.actions.setBpm(bpm);
           
           // Map 0-99 to rotation -135 to +135 degrees (270° sweep)
-          const rotation = (this._currentBpmValue / 99) * 270 - 135;
+          const rotation = encoderAngle(this._currentBpmValue);
           const knob = encoder.querySelector('.encoder-knob');
           if (knob) {
             knob.style.transform = `rotate(${rotation}deg)`;

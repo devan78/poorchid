@@ -10,7 +10,7 @@ Poorchid is a web-based chord synthesizer inspired by the Orchid hardware. It of
 ### 1. Chord Engine
 - **Root Selection:** Choose any root note (C, C#, D, etc.)
 - **Chord Types:** Major, Minor, Diminished, Suspended
-- **Extensions:** Add 6, 7, m7, maj7, 9, 11, 13, etc.
+- **Extensions:** Add 6, 7 (minor 7th), maj7, or 9
 - **Voicing Dial:** Adjusts chord spread and inversion
 - **Key Mode:** Lock to a musical key and scale
 

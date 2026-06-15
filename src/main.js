@@ -5,6 +5,7 @@ import { MidiHandler } from './midi-handler';
 import { Looper } from './looper';
 import { BeatEngine } from './beat-engine';
 import { Arpeggiator, Strummer, PatternPlayer } from './arpeggiator';
+import { Metronome } from './transport';
 import { PoorchidState } from './state';
 import { PoorchidUI } from './ui';
 import { 
@@ -24,6 +25,10 @@ export class PoorchidApp {
     this.logic = new ChordLogic();
     this.voicing = new VoicingEngine();
     this.stateManager = new PoorchidState();
+
+    // Single source of truth for valid state keys: derived from the state object
+    // itself so new keys can never desync from the change-validation guard.
+    this._validStateKeys = new Set(Object.keys(this.stateManager.state));
     
     this.midi = new MidiHandler({
       onNoteOn: (note, vel) => this.handleMidiNoteOn(note, vel),
@@ -42,6 +47,9 @@ export class PoorchidApp {
 
     this.beatEngine = new BeatEngine(this.audio.ctx);
     this.beatEngine.output.connect(this.audio.masterGain);
+
+    // Standalone metronome (independent of the looper's recording click).
+    this.metronome = new Metronome(this.audio.ctx, (time, isAccent) => this.audio.playClick(time, isAccent));
 
     // Initialize arpeggiator with dedicated monophonic voice
     this.arpeggiator = new Arpeggiator(this.audio.ctx, {
@@ -215,6 +223,10 @@ export class PoorchidApp {
     // Clean up subsystems
     this.midi.destroy();
     this.looper.stop();
+    this.metronome.stop();
+    this.beatEngine.stop();
+    this.arpeggiator.stop();
+    this.patternPlayer.stop();
     this.audio.stopAll();
   }
 
@@ -223,6 +235,16 @@ export class PoorchidApp {
     const keyEl = document.querySelector(`.key[data-note="${noteName}"]`);
     if (keyEl) {
       keyEl.classList.toggle('pressed', pressed);
+    }
+  }
+
+  // Start/stop the standalone metronome to match the toggle and power state.
+  _syncMetronome(state) {
+    if (state.metronomeOn && state.powered) {
+      this.metronome.setBpm(state.bpm);
+      this.metronome.start();
+    } else {
+      this.metronome.stop();
     }
   }
 
@@ -283,90 +305,15 @@ export class PoorchidApp {
   }
 
   handleStateChange(state, changedProps) {
-    // State key validation
-    const validKeys = [
-      'powered','root','type','extensions','voicingCenter','filterCutoff','midiConnected','activeMidiNotes','looperState','isPlaying','bassEnabled','bassMode','bassVoicing','bassVolume','volume','flavourEnabled','currentPatch','keyEnabled','keyRoot','keyScale','keyAutoChords','performMode','arpPattern','arpDivision','arpOctave','strumSpeed','rhythmPattern','playstyle','bpm','metronomeOn','currentEffect','fxLocked','fxLevels','recording'
-    ];
+    // State key validation against the keys actually declared on the state object.
     for (const key of changedProps) {
-      if (!validKeys.includes(key)) {
+      if (!this._validStateKeys.has(key)) {
         console.warn(`[Poorchid] Unknown state key changed: '${key}'`);
       }
     }
 
-    // Audio Parameter Updates
-    if (changedProps.includes('filterCutoff')) {
-      this.audio.setFilterCutoff(state.filterCutoff);
-    }
-    if (changedProps.includes('bassVolume')) {
-      this.audio.setBassVolume(state.bassVolume);
-    }
-    if (changedProps.includes('volume')) {
-      this.audio.setVolume(state.volume);
-    }
-    if (changedProps.includes('flavourEnabled')) {
-      this.audio.setFlavourEnabled(state.flavourEnabled);
-    }
-    if (changedProps.includes('currentPatch')) {
-      this.audio.setPatch(state.currentPatch);
-    }
-
-    // Arpeggiator parameter updates
-    if (changedProps.includes('bpm')) {
-      this.arpeggiator.setBpm(state.bpm);
-      this.patternPlayer.setBpm(state.bpm);
-      this.audio.setFxBpm(state.bpm);
-      this.looper.setBpm(state.bpm);
-    }
-    if (changedProps.includes('arpPattern')) {
-      this.arpeggiator.setPattern(state.arpPattern);
-    }
-    if (changedProps.includes('arpDivision')) {
-      this.arpeggiator.setDivision(state.arpDivision);
-    }
-    if (changedProps.includes('arpOctave')) {
-      this.arpeggiator.setOctaveRange(state.arpOctave);
-    }
-    if (changedProps.includes('strumSpeed')) {
-      this.strummer.setSpeed(state.strumSpeed);
-    }
-    if (changedProps.includes('rhythmPattern')) {
-      this.patternPlayer.setPattern(state.rhythmPattern);
-    }
-    
-    // Performance mode change
-    if (changedProps.includes('performMode')) {
-      // Stop arpeggiator when switching modes
-      if (state.performMode !== 'arp') {
-        this.arpeggiator.stop();
-      }
-      // Stop pattern player when switching modes
-      if (state.performMode !== 'pattern') {
-        this.patternPlayer.stop();
-      }
-      
-      // Handle Strummer modes
-      const strumModes = ['strum', 'strum2', 'slop', 'harp'];
-      if (!strumModes.includes(state.performMode)) {
-        this.strummer.release();
-      } else {
-        this.strummer.setMode(state.performMode);
-      }
-    }
-    
-    // FX parameter updates
-    if (changedProps.includes('fxLevels')) {
-      this.audio.setFxLevels(state.fxLevels);
-    }
-    if (changedProps.includes('currentEffect')) {
-      const bypass = state.currentEffect === 'direct';
-      this.audio.setFxBypass(bypass);
-      if (bypass) {
-        // ensure FX lock is false when bypassed? keep as-is but levels remain
-      }
-    }
-    if (changedProps.includes('fxLocked')) {
-      // Optionally handle UI lock state
-    }
+    this.applyAudioParams(state, changedProps);
+    this.applyTimingParams(state, changedProps);
 
     if (changedProps.includes('playstyle')) {
       if (state.playstyle === 'simple' && !this.heldChordType) {
@@ -408,54 +355,102 @@ export class PoorchidApp {
         this.playCurrentChord(this.getPlaybackOptions());
       }
     }
+  }
 
-    // Beat Engine Updates
-    if (changedProps.includes('beatEnabled')) {
-      if (state.beatEnabled) {
-        this.beatEngine.start();
-      } else {
-        this.beatEngine.stop();
-      }
+  // Push static audio-engine parameters (mixer/FX/patch) that changed.
+  applyAudioParams(state, changedProps) {
+    if (changedProps.includes('filterCutoff')) this.audio.setFilterCutoff(state.filterCutoff);
+    if (changedProps.includes('bassVolume')) this.audio.setBassVolume(state.bassVolume);
+    if (changedProps.includes('volume')) this.audio.setVolume(state.volume);
+    if (changedProps.includes('flavourEnabled')) this.audio.setFlavourEnabled(state.flavourEnabled);
+    if (changedProps.includes('currentPatch')) this.audio.setPatch(state.currentPatch);
+    if (changedProps.includes('fxLevels')) this.audio.setFxLevels(state.fxLevels);
+    if (changedProps.includes('currentEffect')) {
+      this.audio.setFxBypass(state.currentEffect === 'direct');
     }
-    if (changedProps.includes('beatPattern')) {
-      this.beatEngine.setPattern(state.beatPattern);
-    }
+  }
+
+  // Fan out tempo and performance-engine parameter changes.
+  applyTimingParams(state, changedProps) {
     if (changedProps.includes('bpm')) {
+      this.arpeggiator.setBpm(state.bpm);
+      this.patternPlayer.setBpm(state.bpm);
+      this.audio.setFxBpm(state.bpm);
+      this.looper.setBpm(state.bpm);
+      this.metronome.setBpm(state.bpm);
       this.beatEngine.setBpm(state.bpm);
     }
+
+    // Standalone metronome follows both its toggle and power.
+    if (changedProps.includes('metronomeOn') || changedProps.includes('powered')) {
+      this._syncMetronome(state);
+    }
+
+    if (changedProps.includes('arpPattern')) this.arpeggiator.setPattern(state.arpPattern);
+    if (changedProps.includes('arpDivision')) this.arpeggiator.setDivision(state.arpDivision);
+    if (changedProps.includes('arpOctave')) this.arpeggiator.setOctaveRange(state.arpOctave);
+    if (changedProps.includes('strumSpeed')) this.strummer.setSpeed(state.strumSpeed);
+    if (changedProps.includes('rhythmPattern')) this.patternPlayer.setPattern(state.rhythmPattern);
+
+    if (changedProps.includes('performMode')) {
+      const strumModes = ['strum', 'strum2', 'slop', 'harp'];
+      if (state.performMode !== 'arp') this.arpeggiator.stop();
+      if (state.performMode !== 'pattern') this.patternPlayer.stop();
+      if (!strumModes.includes(state.performMode)) this.strummer.release();
+      else this.strummer.setMode(state.performMode);
+    }
+
+    // Beat engine
+    if (changedProps.includes('beatEnabled')) {
+      if (state.beatEnabled) this.beatEngine.start();
+      else this.beatEngine.stop();
+    }
+    if (changedProps.includes('beatPattern')) this.beatEngine.setPattern(state.beatPattern);
   }
 
   playCurrentChord(options = {}) {
     const state = this.stateManager.state;
 
-    let root = state.root;
-    
-    // Determine octave offset from active MIDI notes
-    let octaveOffset = 0;
-    if (state.activeMidiNotes.size > 0) {
-      const notes = Array.from(state.activeMidiNotes);
-      let matchingNote = null;
-      // Find the most recent note that matches the current root
-      for (let i = notes.length - 1; i >= 0; i--) {
-        if (this.logic.getNoteName(notes[i]) === state.root) {
-          matchingNote = notes[i];
-          break;
-        }
-      }
-      
-      if (matchingNote !== null) {
-        const defaultMidi = this.logic.getMidiRoot(state.root);
-        octaveOffset = matchingNote - defaultMidi;
-      }
+    const octaveOffset = this.computeOctaveOffset(state);
+    const { voicedNotes, bassNote } = this.buildVoicing(state, options, octaveOffset);
+
+    // Performance modes (arp/strum/pattern) own their own playback + bass.
+    if (this.dispatchPerformanceMode(state, voicedNotes, bassNote)) {
+      this.stateManager.setIsPlaying(true);
+      return;
     }
 
+    // Direct mode: play immediately (stop arp/pattern if running)
+    if (this.arpeggiator.isRunning) this.arpeggiator.stop();
+    if (this.patternPlayer.isRunning) this.patternPlayer.stop();
+
+    this.routeBass(state, voicedNotes, bassNote);
+    this.stateManager.setIsPlaying(true);
+    this.recordToLooper(voicedNotes);
+  }
+
+  // Octave shift derived from the most-recent held MIDI note matching the root,
+  // so chords follow the register you actually played.
+  computeOctaveOffset(state) {
+    if (state.activeMidiNotes.size === 0) return 0;
+    const notes = Array.from(state.activeMidiNotes);
+    for (let i = notes.length - 1; i >= 0; i--) {
+      if (this.logic.getNoteName(notes[i]) === state.root) {
+        return notes[i] - this.logic.getMidiRoot(state.root);
+      }
+    }
+    return 0;
+  }
+
+  // Build the voiced chord notes and the bass note for the current state.
+  buildVoicing(state, options, octaveOffset) {
+    let root = state.root;
     let chordType = options.overrideType || state.type;
     let forceSingle = !!options.forceSingle;
-    // Strum mode should always build chords; ignore single-note forcing here
+
+    // Strum modes always build chords; ignore single-note forcing.
     const strumModes = ['strum', 'strum2', 'slop', 'harp'];
-    if (strumModes.includes(state.performMode)) {
-      forceSingle = false;
-    }
+    if (strumModes.includes(state.performMode)) forceSingle = false;
 
     // Key mode auto-chord (diatonic)
     if (state.keyEnabled && state.keyAutoChords) {
@@ -464,141 +459,113 @@ export class PoorchidApp {
       forceSingle = false;
     }
 
-    // 1. Get base notes
     const baseNotes = forceSingle
       ? [this.logic.getMidiRoot(root)]
-      : this.logic.getNotes(
-        root, 
-        chordType, 
-        Array.from(state.extensions)
-      );
+      : this.logic.getNotes(root, chordType, Array.from(state.extensions));
 
-    // 2. Apply voicing
-    // Shift voicing center to match the played octave
+    // Shift the voicing center to match the played octave.
     const effectiveCenter = Math.max(0, Math.min(127, state.voicingCenter + octaveOffset));
     const voicedNotes = this.voicing.getVoicing(baseNotes, effectiveCenter);
 
-    // 3. Calculate bass note (root - 2 octaves + voicing offset + played octave)
+    // Bass note: root - 2 octaves + voicing offset + played octave.
     const rootMidi = this.logic.getMidiRoot(state.root);
     const bassNote = rootMidi + octaveOffset - 24 + state.bassVoicing;
 
-    // 4. Handle performance mode
+    return { voicedNotes, bassNote };
+  }
+
+  // Route arp/strum/pattern performance modes. Returns true if a mode handled
+  // playback (so the caller skips direct-mode chord output).
+  dispatchPerformanceMode(state, voicedNotes, bassNote) {
+    const playBassIfEnabled = () => {
+      if (state.bassEnabled) this.audio.playBass(bassNote);
+    };
+
     if (state.performMode === 'arp') {
-      // Arpeggiator mode: update notes and start if not running
       this.arpeggiator.updateNotes(voicedNotes);
       if (!this.arpeggiator.isRunning) {
-        let startTime = null;
-        if (state.beatEnabled) {
-           startTime = this.beatEngine.getNextNoteTime();
-        }
+        const startTime = state.beatEnabled ? this.beatEngine.getNextNoteTime() : null;
         this.arpeggiator.start(voicedNotes, startTime);
       }
-      // Bass still plays normally in arp mode
-      if (state.bassEnabled) {
-        this.audio.playBass(bassNote);
-      }
-      this.stateManager.setIsPlaying(true);
-      return;
-    } else if (['strum', 'strum2', 'slop', 'harp'].includes(state.performMode)) {
-      // Strum mode: play chord with strum effect
+      playBassIfEnabled();
+      return true;
+    }
+
+    if (['strum', 'strum2', 'slop', 'harp'].includes(state.performMode)) {
       this.strummer.release();
       this.strummer.setMode(state.performMode);
       this.strummer.strum(voicedNotes);
-      if (state.bassEnabled) {
-        this.audio.playBass(bassNote);
-      }
-      this.stateManager.setIsPlaying(true);
-      return;
-    } else if (state.performMode === 'pattern') {
-      // Pattern mode: play notes in rhythmic patterns synced to BPM
+      playBassIfEnabled();
+      return true;
+    }
+
+    if (state.performMode === 'pattern') {
       this.patternPlayer.updateNotes(voicedNotes);
       if (!this.patternPlayer.isRunning) {
-        let startTime = null;
-        if (state.beatEnabled) {
-           startTime = this.beatEngine.getNextNoteTime();
-        }
+        const startTime = state.beatEnabled ? this.beatEngine.getNextNoteTime() : null;
         this.patternPlayer.start(voicedNotes, startTime);
       }
-      // Bass still plays normally in pattern mode
-      if (state.bassEnabled) {
-        this.audio.playBass(bassNote);
-      }
-      this.stateManager.setIsPlaying(true);
-      return;
-    }
-    
-    // Direct mode: play immediately (stop arp/pattern if running)
-    if (this.arpeggiator.isRunning) {
-      this.arpeggiator.stop();
-    }
-    if (this.patternPlayer.isRunning) {
-      this.patternPlayer.stop();
+      playBassIfEnabled();
+      return true;
     }
 
-    // 5. Play based on bass mode
+    return false;
+  }
+
+  // Direct-mode chord + bass output, per the selected bass mode.
+  routeBass(state, voicedNotes, bassNote) {
     if (!state.bassEnabled) {
-      // Bass off: just play chords normally
       this.audio.playChord(voicedNotes);
       this.audio.stopBass();
-    } else {
-      // Bass enabled: behavior depends on mode
-      switch (state.bassMode) {
-        case 'direct':
-          this.audio.playChord(voicedNotes);
-          this.audio.stopBass();
-          break;
-        case 'solo':
-          // Solo: Bass plays independently, no chords
-          this.audio.playChord([]);
-          this.audio.playBass(bassNote);
-          break;
-          
-        case 'unison':
-          // Unison: Bass matches the lowest note of the chord
-          this.audio.playChord(voicedNotes);
-          if (voicedNotes.length > 0) {
-            const lowestNote = Math.min(...voicedNotes);
-            this.audio.playBass(lowestNote - 12 + state.bassVoicing);
-          }
-          break;
-          
-        case 'single':
-          // Single Notes: One bass note (root) per chord
-          this.audio.playChord(voicedNotes);
-          this.audio.playBass(bassNote);
-          break;
-          
-        case 'chords':
-        default:
-          // Chords Only: Bass plays only when chords play (root note)
-          this.audio.playChord(voicedNotes);
-          if (voicedNotes.length > 0) {
-            this.audio.playBass(bassNote);
-          } else {
-            this.audio.stopBass();
-          }
-          break;
-      }
+      return;
     }
 
-    this.stateManager.setIsPlaying(true);
-    
-    // 5. Record to Looper if active
-    if (this.looper.state === 'recording' || this.looper.state === 'overdubbing') {
-      // Stop notes no longer playing
-      for (const note of this.currentRecordedNotes) {
-        if (!voicedNotes.includes(note)) {
-          this.looper.addEvent({ type: 'noteOff', note });
-          this.currentRecordedNotes.delete(note);
+    switch (state.bassMode) {
+      case 'direct':
+        this.audio.playChord(voicedNotes);
+        this.audio.stopBass();
+        break;
+      case 'solo':
+        // Bass plays independently, no chords.
+        this.audio.playChord([]);
+        this.audio.playBass(bassNote);
+        break;
+      case 'unison':
+        // Bass matches the lowest chord note (one octave below).
+        this.audio.playChord(voicedNotes);
+        if (voicedNotes.length > 0) {
+          this.audio.playBass(Math.min(...voicedNotes) - 12 + state.bassVoicing);
         }
+        break;
+      case 'single':
+        // One bass note (root) per chord.
+        this.audio.playChord(voicedNotes);
+        this.audio.playBass(bassNote);
+        break;
+      case 'chords':
+      default:
+        // Bass plays only when chords play.
+        this.audio.playChord(voicedNotes);
+        if (voicedNotes.length > 0) this.audio.playBass(bassNote);
+        else this.audio.stopBass();
+        break;
+    }
+  }
+
+  // Capture the currently sounding notes into the looper while recording.
+  recordToLooper(voicedNotes) {
+    if (this.looper.state !== 'recording' && this.looper.state !== 'overdubbing') return;
+
+    for (const note of this.currentRecordedNotes) {
+      if (!voicedNotes.includes(note)) {
+        this.looper.addEvent({ type: 'noteOff', note });
+        this.currentRecordedNotes.delete(note);
       }
-      
-      // Start new notes
-      for (const note of voicedNotes) {
-        if (!this.currentRecordedNotes.has(note)) {
-          this.looper.addEvent({ type: 'noteOn', note, velocity: 100 });
-          this.currentRecordedNotes.add(note);
-        }
+    }
+    for (const note of voicedNotes) {
+      if (!this.currentRecordedNotes.has(note)) {
+        this.looper.addEvent({ type: 'noteOn', note, velocity: 100 });
+        this.currentRecordedNotes.add(note);
       }
     }
   }
