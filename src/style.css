@@ -92,6 +92,41 @@ header p {
   margin-left: 0.4rem;
 }
 
+/* Interaction hint line under the instrument */
+.hint-bar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 6px 18px;
+  margin: 18px auto 0;
+  padding: 9px 18px;
+  max-width: 760px;
+  font-size: 0.7rem;
+  letter-spacing: 0.02em;
+  color: #9a9488;
+  text-align: center;
+  background: rgba(255,255,255,0.025);
+  border: 1px solid rgba(255,255,255,0.05);
+  border-radius: 8px;
+}
+
+.hint-bar b {
+  color: var(--accent-yellow);
+  font-weight: 700;
+}
+
+.hint-bar kbd {
+  font-family: ui-monospace, 'SF Mono', monospace;
+  font-size: 0.66rem;
+  background: #2a2a2a;
+  border: 1px solid #444;
+  border-bottom-width: 2px;
+  border-radius: 3px;
+  padding: 0 5px;
+  color: #d8d2c4;
+}
+
 /* Main Synth Chassis */
 #synth-interface {
   background: linear-gradient(to bottom, var(--chassis-bg), var(--chassis-dark));
@@ -159,15 +194,16 @@ header p {
   justify-content: space-between;
   align-items: stretch;
   width: 100%;
-  background: var(--panel-bg);
-  padding: 16px 20px;
+  /* Cream instrument body — the chord buttons and keys sit on this. */
+  background: linear-gradient(to bottom, #ece7da 0%, #ddd7c6 100%);
+  padding: 18px 22px 20px;
   border-radius: 0 0 4px 4px;
-  box-shadow: 
-    inset 0 -2px 8px rgba(0,0,0,0.6),
-    inset 0 0 0 1px rgba(0,0,0,0.5),
-    0 1px 0 rgba(255,255,255,0.3);
-  gap: 16px;
-  border-top: 1px solid #2a2a2a;
+  box-shadow:
+    inset 0 2px 4px rgba(255,255,255,0.7),
+    inset 0 -2px 6px rgba(0,0,0,0.12),
+    inset 0 0 0 1px rgba(0,0,0,0.08);
+  gap: 18px;
+  border-top: 2px solid rgba(0,0,0,0.18);
 }
 
 .performance-controls {
@@ -279,144 +315,95 @@ header p {
 
 .dial-label {
   font-size: 0.5rem;
-  font-weight: 600;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: var(--text-label);
+  color: #6b6357; /* dark warm grey — reads on the cream body */
 }
 
+/* Chord buttons — round, colourful, Orchid-style. Each button carries its own
+   accent via --btn-color; resting state is a soft tinted cap, active lights up. */
 .perf-btn {
+  --btn-color: #8a8275;
   flex: 1;
   aspect-ratio: 1;
   padding: 8px;
-  font-size: 0.7rem;
-  font-weight: 600;
+  font-size: 0.72rem;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.03em;
-  color: #777;
+  color: #2a241c;
   border: none;
-  border-radius: 8px;
+  border-radius: 50%;
   cursor: pointer;
-  transition: all 0.08s ease-out;
+  transition: transform 0.08s ease-out, box-shadow 0.08s ease-out, background 0.08s ease-out;
   position: relative;
   top: 0;
   display: flex;
   align-items: center;
   justify-content: center;
+  background:
+    radial-gradient(circle at 50% 32%, rgba(255,255,255,0.55) 0%, transparent 45%),
+    linear-gradient(to bottom,
+      color-mix(in srgb, var(--btn-color) 38%, #f3eedf) 0%,
+      color-mix(in srgb, var(--btn-color) 30%, #d9d2bf) 100%);
+  box-shadow:
+    0 3px 0 color-mix(in srgb, var(--btn-color) 45%, #b3ab95),
+    0 5px 9px rgba(0,0,0,0.28),
+    inset 0 1px 0 rgba(255,255,255,0.7);
 }
 
-/* Shiny type buttons (upper row) */
-.perf-btn[data-type] {
-  background: 
-    linear-gradient(160deg, rgba(255,255,255,0.25) 0%, rgba(255,255,255,0.08) 30%, transparent 50%),
-    radial-gradient(ellipse 80% 50% at 50% 20%, rgba(80,80,80,0.5) 0%, transparent 50%),
-    linear-gradient(to bottom, #3a3a3a 0%, #2a2a2a 50%, #252525 100%);
-  box-shadow: 
-    0 3px 0 #1a1a1a,
-    0 4px 8px rgba(0,0,0,0.5),
-    inset 0 1px 0 rgba(255,255,255,0.2),
-    inset 0 0 0 1px rgba(255,255,255,0.08),
-    inset 0 -8px 16px rgba(0,0,0,0.3);
-}
-
-/* Matte extension buttons (lower row) */
-.perf-btn[data-ext] {
-  background: #2a2a2a;
-  box-shadow: 
-    0 3px 0 #1a1a1a,
-    0 4px 8px rgba(0,0,0,0.5),
-    inset 0 0 0 1px rgba(0,0,0,0.3),
-    inset 0 -6px 12px rgba(0,0,0,0.4),
-    inset 0 4px 8px rgba(0,0,0,0.2);
-}
-
-.perf-btn::before {
-  content: '';
-  position: absolute;
-  top: 15%;
-  left: 15%;
-  right: 15%;
-  bottom: 15%;
-  border-radius: 50%;
-  background: radial-gradient(ellipse at 50% 40%, 
-    rgba(0,0,0,0.3) 0%, 
-    rgba(0,0,0,0.15) 50%,
-    transparent 70%);
-  pointer-events: none;
-}
-
-.perf-btn[data-type]:hover {
-  background: 
-    linear-gradient(160deg, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0.1) 30%, transparent 50%),
-    radial-gradient(ellipse 80% 50% at 50% 20%, rgba(100,100,100,0.5) 0%, transparent 50%),
-    linear-gradient(to bottom, #454545 0%, #353535 50%, #2a2a2a 100%);
-  color: #999;
+.perf-btn:hover {
   transform: translateY(-1px);
-}
-
-.perf-btn[data-ext]:hover {
-  background: #333;
-  color: #999;
-  transform: translateY(-1px);
+  background:
+    radial-gradient(circle at 50% 32%, rgba(255,255,255,0.65) 0%, transparent 45%),
+    linear-gradient(to bottom,
+      color-mix(in srgb, var(--btn-color) 46%, #f5f0e2) 0%,
+      color-mix(in srgb, var(--btn-color) 38%, #ded7c4) 100%);
 }
 
 .perf-btn:active {
   top: 2px;
-  box-shadow: 
-    0 1px 0 #1a1a1a,
-    0 2px 4px rgba(0,0,0,0.3),
-    inset 0 0 0 1px rgba(255,255,255,0.05),
-    inset 0 -4px 12px rgba(0,0,0,0.5),
-    inset 0 4px 8px rgba(0,0,0,0.3);
+  box-shadow:
+    0 1px 0 color-mix(in srgb, var(--btn-color) 45%, #b3ab95),
+    0 2px 4px rgba(0,0,0,0.25),
+    inset 0 2px 5px rgba(0,0,0,0.2);
 }
 
-/* Chord type buttons - teal when active */
-.perf-btn[data-type].active {
-  background: 
-    radial-gradient(ellipse 80% 50% at 50% 20%, rgba(40,180,150,0.3) 0%, transparent 50%),
-    radial-gradient(circle at 50% 50%, #0d6b5a 0%, var(--accent-teal) 40%, #1fa088 100%);
+/* Active (engaged) — full colour with a soft glow halo. */
+.perf-btn.active {
   color: #fff;
-  text-shadow: 0 1px 2px rgba(0,0,0,0.3);
-  box-shadow: 
-    0 1px 0 #0d5c4a,
-    0 2px 4px rgba(0,0,0,0.3),
-    inset 0 0 0 1px rgba(255,255,255,0.1),
-    inset 0 -8px 16px rgba(0,0,0,0.3),
-    inset 0 8px 12px rgba(0,80,60,0.2),
-    0 0 15px rgba(26, 145, 120, 0.4);
+  text-shadow: 0 1px 2px rgba(0,0,0,0.35);
+  background:
+    radial-gradient(circle at 50% 30%, rgba(255,255,255,0.45) 0%, transparent 42%),
+    radial-gradient(circle at 50% 55%,
+      color-mix(in srgb, var(--btn-color) 80%, #000) 0%,
+      var(--btn-color) 55%,
+      color-mix(in srgb, var(--btn-color) 75%, #fff) 100%);
+  box-shadow:
+    0 1px 0 color-mix(in srgb, var(--btn-color) 60%, #000),
+    0 2px 5px rgba(0,0,0,0.3),
+    inset 0 1px 0 rgba(255,255,255,0.25),
+    0 0 16px color-mix(in srgb, var(--btn-color) 60%, transparent);
   top: 2px;
 }
 
-.perf-btn[data-type].active::before {
-  background: radial-gradient(ellipse at 50% 40%, 
-    rgba(0,0,0,0.2) 0%, 
-    rgba(0,0,0,0.1) 50%,
-    transparent 70%);
+/* Yellow active buttons need a dark label for contrast. */
+#btn-sus.active,
+#btn-M7.active {
+  color: #2a1e05;
+  text-shadow: 0 1px 0 rgba(255,255,255,0.35);
 }
 
-/* Extension buttons - mustard when active */
-.perf-btn[data-ext].active {
-  background: 
-    radial-gradient(ellipse 80% 50% at 50% 20%, rgba(255,200,50,0.3) 0%, transparent 50%),
-    radial-gradient(circle at 50% 50%, #b8860b 0%, var(--accent-yellow) 40%, #edb515 100%);
-  color: #1a1a1a;
-  text-shadow: 0 1px 0 rgba(255,255,255,0.3);
-  box-shadow: 
-    0 1px 0 #9a7210,
-    0 2px 4px rgba(0,0,0,0.3),
-    inset 0 0 0 1px rgba(255,255,255,0.15),
-    inset 0 -8px 16px rgba(0,0,0,0.25),
-    inset 0 8px 12px rgba(180,130,0,0.2),
-    0 0 15px rgba(230, 168, 23, 0.3);
-  top: 2px;
-}
-
-.perf-btn[data-ext].active::before {
-  background: radial-gradient(ellipse at 50% 40%, 
-    rgba(0,0,0,0.15) 0%, 
-    rgba(0,0,0,0.08) 50%,
-    transparent 70%);
-}
+/* Per-button accents (top row: chord types, bottom row: extensions). */
+#btn-dim { --btn-color: var(--accent-red); }
+#btn-min { --btn-color: var(--accent-teal); }
+#btn-maj { --btn-color: var(--accent-orange); }
+#btn-sus { --btn-color: var(--accent-yellow); }
+#btn-6   { --btn-color: var(--accent-teal); }
+#btn-m7  { --btn-color: var(--accent-orange); }
+#btn-M7  { --btn-color: var(--accent-yellow); }
+#btn-9   { --btn-color: var(--accent-red); }
 
 .placeholder-text {
   color: #444;
@@ -506,70 +493,59 @@ header p {
   height: 44px;
   border-radius: 50%;
   position: relative;
-  box-shadow: 
-    0 3px 6px rgba(0,0,0,0.4),
-    0 1px 3px rgba(0,0,0,0.3),
-    inset 0 1px 1px rgba(255,255,255,0.1);
-  transition: box-shadow 0.1s ease;
-  /* Subtle grip ridges via repeating conic gradient */
-  --knob-color: #3a3a3a;
-  --knob-highlight: #484848;
-  --knob-shadow: #2a2a2a;
-  background: 
-    /* Larger center cap (more subtle edge grip) */
-    radial-gradient(circle at 50% 50%, var(--knob-color) 65%, transparent 66%),
-    /* Subtle grip ridges - only visible at edge */
-    repeating-conic-gradient(
-      from 0deg,
-      var(--knob-highlight) 0deg 3deg,
-      var(--knob-shadow) 3deg 6deg,
-      var(--knob-color) 6deg 9deg
-    );
+  --collar: #343434; /* coloured skirt around the metal cap */
+  transition: box-shadow 0.1s ease, transform 0.1s ease;
+  /* Coloured collar with fine machined grip ridges */
+  background:
+    repeating-conic-gradient(from 0deg,
+      color-mix(in srgb, var(--collar) 78%, #fff) 0deg 4.5deg,
+      color-mix(in srgb, var(--collar) 62%, #000) 4.5deg 9deg);
+  box-shadow:
+    0 4px 9px rgba(0,0,0,0.45),
+    0 1px 2px rgba(0,0,0,0.4),
+    inset 0 0 0 1px rgba(0,0,0,0.4);
 }
 
+/* Brushed-aluminium cap */
 .encoder-knob::before {
   content: '';
   position: absolute;
-  top: 6px;
-  left: 6px;
-  right: 6px;
-  bottom: 6px;
+  inset: 7px;
   border-radius: 50%;
-  background: var(--knob-color);
-  box-shadow: 
-    inset 0 1px 3px rgba(255,255,255,0.12),
-    inset 0 -1px 3px rgba(0,0,0,0.3);
+  background:
+    linear-gradient(145deg,
+      #ececee 0%, #c2c5c9 26%, #9a9ea3 50%, #c7cacf 73%, #72767b 100%);
+  box-shadow:
+    inset 0 1px 1px rgba(255,255,255,0.75),
+    inset 0 -2px 3px rgba(0,0,0,0.4),
+    0 1px 2px rgba(0,0,0,0.35);
 }
 
-/* Top shine/reflection */
+/* Soft top reflection on the cap */
 .encoder-knob::after {
   content: '';
   position: absolute;
-  top: 2px;
-  left: 20%;
-  right: 20%;
-  height: 35%;
-  border-radius: 50% 50% 40% 40%;
-  background: linear-gradient(
-    180deg,
-    rgba(255,255,255,0.15) 0%,
-    rgba(255,255,255,0.03) 50%,
-    transparent 100%
-  );
+  top: 8px;
+  left: 27%;
+  right: 27%;
+  height: 28%;
+  border-radius: 50%;
+  background: linear-gradient(180deg,
+    rgba(255,255,255,0.6) 0%, rgba(255,255,255,0.06) 70%, transparent 100%);
   pointer-events: none;
 }
 
 .encoder-indicator {
   position: absolute;
-  top: 8px;
+  top: 5px;
   left: 50%;
   transform: translateX(-50%);
-  width: 2px;
-  height: 6px;
-  background: #fff;
-  border-radius: 1px;
-  box-shadow: 0 0 3px rgba(255,255,255,0.4);
-  z-index: 2;
+  width: 3px;
+  height: 12px;
+  background: #2b2b2b;
+  border-radius: 2px;
+  box-shadow: 0 1px 0 rgba(255,255,255,0.45);
+  z-index: 3;
 }
 
 .encoder:hover .encoder-knob {
@@ -605,106 +581,34 @@ header p {
   color: var(--text-label);
 }
 
-/* Encoder Colors */
-.encoder.yellow .encoder-knob {
-  --knob-color: #c9981d;
-  --knob-highlight: #d9a82d;
-  --knob-shadow: #a07810;
-}
+/* Encoder accent collars */
+.encoder.yellow   .encoder-knob { --collar: #c9981d; }
+.encoder.charcoal .encoder-knob { --collar: #343434; }
+.encoder.red      .encoder-knob { --collar: #a83232; }
+.encoder.green    .encoder-knob { --collar: #1a9178; }
 
-.encoder.yellow .encoder-indicator {
-  background: #1a1a1a;
-  box-shadow: none;
-}
+/* Active: brighter collar + an accent glow halo + a lit indicator.
+   --glow is set on the .encoder and inherited by the knob/indicator. */
+.encoder.yellow.active   { --glow: rgba(230,168,23,0.65); }
+.encoder.charcoal.active { --glow: rgba(0,180,220,0.6); }
+.encoder.red.active      { --glow: rgba(208,48,48,0.6); }
+.encoder.green.active    { --glow: rgba(32,176,144,0.6); }
 
-/* Perform encoder active state (when not in direct mode) */
-.encoder.yellow.active .encoder-knob {
-  --knob-color: #e0b020;
-  --knob-highlight: #f0c030;
-  --knob-shadow: #b08010;
+.encoder.yellow.active   .encoder-knob { --collar: #e6a817; }
+.encoder.charcoal.active .encoder-knob { --collar: #00aacc; }
+.encoder.red.active      .encoder-knob { --collar: #d83838; }
+.encoder.green.active    .encoder-knob { --collar: #22b394; }
+
+.encoder.active .encoder-knob {
   box-shadow:
-    0 0 12px rgba(255, 235, 59, 0.5),
-    inset 0 3px 6px var(--knob-highlight),
-    inset 0 -3px 6px var(--knob-shadow);
+    0 4px 9px rgba(0,0,0,0.45),
+    0 0 15px var(--glow, rgba(255,255,255,0.4)),
+    inset 0 0 0 1px rgba(0,0,0,0.35);
 }
 
-.encoder.yellow.active .encoder-indicator {
-  background: #ffeb3b;
-  box-shadow: 0 0 10px rgba(255, 235, 59, 0.9);
-}
-
-.encoder.charcoal .encoder-knob {
-  --knob-color: #3a3a3a;
-  --knob-highlight: #5a5a5a;
-  --knob-shadow: #1a1a1a;
-}
-
-/* Key encoder active state (when key lock is enabled) */
-.encoder.charcoal.active .encoder-knob {
-  --knob-color: #0088aa;
-  --knob-highlight: #00b4dc;
-  --knob-shadow: #005577;
-  box-shadow:
-    0 0 12px rgba(0, 180, 220, 0.5),
-    inset 0 3px 6px var(--knob-highlight),
-    inset 0 -3px 6px var(--knob-shadow);
-}
-
-.encoder.charcoal.active .encoder-indicator {
-  background: #00e5ff;
-  box-shadow: 0 0 10px rgba(0, 229, 255, 0.9);
-}
-
-.encoder.red .encoder-knob {
-  --knob-color: #b02525;
-  --knob-highlight: #c43030;
-  --knob-shadow: #801818;
-}
-
-.encoder.red .encoder-indicator {
+.encoder.active .encoder-indicator {
   background: #fff;
-  box-shadow: 0 0 6px rgba(255,255,255,0.8);
-}
-
-/* Bass encoder active state (when bass is enabled) */
-.encoder.red.active .encoder-knob {
-  --knob-color: #d03030;
-  --knob-highlight: #e84040;
-  box-shadow:
-    0 0 12px rgba(208, 48, 48, 0.5),
-    inset 0 3px 6px var(--knob-highlight),
-    inset 0 -3px 6px var(--knob-shadow);
-}
-
-.encoder.red.active .encoder-indicator {
-  background: #ff4444;
-  box-shadow: 0 0 10px rgba(255,68,68,0.9);
-}
-
-/* Green Encoder (Looper Play) */
-.encoder.green .encoder-knob {
-  --knob-color: #1a9178;
-  --knob-highlight: #2abfa0;
-  --knob-shadow: #126654;
-}
-
-.encoder.green .encoder-indicator {
-  background: #fff;
-  box-shadow: 0 0 6px rgba(255,255,255,0.8);
-}
-
-.encoder.green.active .encoder-knob {
-  --knob-color: #20b090;
-  --knob-highlight: #30d0b0;
-  box-shadow:
-    0 0 12px rgba(32, 176, 144, 0.5),
-    inset 0 3px 6px var(--knob-highlight),
-    inset 0 -3px 6px var(--knob-shadow);
-}
-
-.encoder.green.active .encoder-indicator {
-  background: #40ffcc;
-  box-shadow: 0 0 10px rgba(64, 255, 204, 0.9);
+  box-shadow: 0 0 9px var(--glow, rgba(255,255,255,0.6));
 }
 
 /* Bass mode label under encoder */
@@ -991,14 +895,86 @@ button.active {
   color: #fff;
 }
 
+/* === Keyboard === */
+.keyboard {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  position: relative;
+  flex: 1 1 auto;
+  padding: 12px 8px 0;
+  min-height: 128px;
+}
+
+.key {
+  position: relative;
+  flex: 0 0 38px;
+  height: 116px;
+  border-radius: 0 0 5px 5px;
+  cursor: pointer;
+  transition: background 0.05s ease, box-shadow 0.05s ease, transform 0.05s ease;
+  user-select: none;
+}
+
+.key.white {
+  background: linear-gradient(to bottom, #fbf7ec 0%, #efe9d8 92%, #e0d9c4 100%);
+  border: 1px solid #cdc6b1;
+  border-top: none;
+  box-shadow:
+    inset 0 -7px 9px rgba(0,0,0,0.07),
+    inset 0 1px 0 rgba(255,255,255,0.9),
+    0 3px 4px rgba(0,0,0,0.28);
+  z-index: 1;
+}
+
+.key.black {
+  flex: 0 0 24px;
+  height: 74px;
+  margin: 0 -12px;
+  z-index: 2;
+  background: linear-gradient(to bottom, #322d28 0%, #18150f 100%);
+  border: 1px solid #000;
+  border-top: none;
+  border-radius: 0 0 4px 4px;
+  box-shadow:
+    inset 0 -4px 5px rgba(255,255,255,0.08),
+    0 4px 5px rgba(0,0,0,0.5);
+}
+
+.key.white:hover { background: linear-gradient(to bottom, #fffdf6, #f3eede 92%, #e6e0cc); }
+.key.black:hover { background: linear-gradient(to bottom, #3c372f, #201c16); }
+
+.key.white:active,
+.key.white.pressed {
+  background: linear-gradient(to bottom, #f4cd96 0%, #ecb069 100%);
+  box-shadow: inset 0 5px 9px rgba(140,80,10,0.35), 0 1px 2px rgba(0,0,0,0.2);
+  transform: translateY(1px);
+}
+
+.key.black:active,
+.key.black.pressed {
+  background: linear-gradient(to bottom, #b8742a 0%, #8a4f12 100%);
+  box-shadow: inset 0 3px 6px rgba(0,0,0,0.5);
+  transform: translateY(1px);
+}
+
 .key-hint {
   position: absolute;
-  bottom: 2px;
-  right: 4px;
+  bottom: 3px;
+  right: 5px;
   font-size: 8px;
-  color: rgba(255,255,255,0.3);
+  color: rgba(40,30,15,0.4);
   font-family: monospace;
   pointer-events: none;
+}
+
+.perf-btn.active .key-hint {
+  color: rgba(255,255,255,0.65);
+}
+
+#btn-sus.active .key-hint,
+#btn-M7.active .key-hint {
+  color: rgba(40,30,15,0.55);
 }
 
 .key-label {
