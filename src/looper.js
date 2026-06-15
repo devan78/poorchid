@@ -100,7 +100,13 @@ export class Looper {
         this.loopDuration = snappedBeats * beatDuration;
       }
       // If fixed mode, loopDuration is already set
-      
+
+      // Fold every recorded event into [0, loopDuration) now that the loop
+      // length is final. Free-mode events were captured against an unknown
+      // (Infinity) duration, so without this they can land past the seam and
+      // never fire once the duration is snapped.
+      this.normalizeEventTimes();
+
       this.state = 'playing';
       this.startPlayback(startTime);
     } else if (this.state === 'overdubbing') {
@@ -207,8 +213,29 @@ export class Looper {
     this.playbackInterval = requestAnimationFrame(tick);
   }
 
+  // Fold all recorded event times into the half-open window [0, loopDuration)
+  // so each event fires exactly once per cycle.
+  normalizeEventTimes() {
+    const L = this.loopDuration;
+    if (!L || L <= 0) return;
+    this.layers.forEach(layer => {
+      layer.events.forEach(event => {
+        // Recorded times are non-negative elapsed seconds. For an event already
+        // inside [0, L) the modulo is a no-op (and bit-identical, so it can't
+        // drift across a tick boundary); only events past the seam get folded.
+        if (event.time >= L || event.time < 0) {
+          let nt = event.time % L;
+          if (nt < 0) nt += L;
+          event.time = nt >= L ? 0 : nt;
+        }
+      });
+    });
+  }
+
   tick(currentLoopTime) {
-    // Check all layers for events between lastTickTime and currentLoopTime
+    // Fire events in the half-open window (lastTickTime, currentLoopTime].
+    // Combined with normalizeEventTimes() keeping times in [0, loopDuration),
+    // consecutive windows never overlap, so no event double-fires at the seam.
     this.layers.forEach(layer => {
       layer.events.forEach(event => {
         if (event.time > this.lastTickTime && event.time <= currentLoopTime) {

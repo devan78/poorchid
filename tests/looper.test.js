@@ -90,10 +90,39 @@ describe('Looper', () => {
     looper.play();
     looper.overdub(); // Layer 2
     looper.play(); // Commit Layer 2
-    
+
     expect(looper.layers).toHaveLength(2);
-    
+
     looper.undo();
     expect(looper.layers).toHaveLength(1);
+  });
+
+  describe('normalizeEventTimes', () => {
+    it('folds events past the seam back into [0, loopDuration)', () => {
+      looper.loopDuration = 4.0;
+      looper.layers = [{ events: [
+        { type: 'noteOn', note: 60, time: 0.5 },  // already inside
+        { type: 'noteOn', note: 62, time: 4.0 },  // exactly on the seam
+        { type: 'noteOn', note: 64, time: 4.5 },  // past the seam
+      ]}];
+
+      looper.normalizeEventTimes();
+
+      const times = looper.layers[0].events.map(e => e.time);
+      expect(times[0]).toBe(0.5);   // untouched (bit-identical, no drift)
+      expect(times[1]).toBe(0);     // seam belongs to start of cycle
+      expect(times[2]).toBeCloseTo(0.5, 6);
+      times.forEach(t => {
+        expect(t).toBeGreaterThanOrEqual(0);
+        expect(t).toBeLessThan(looper.loopDuration);
+      });
+    });
+
+    it('is a no-op when loopDuration is unknown', () => {
+      looper.loopDuration = 0;
+      looper.layers = [{ events: [{ type: 'noteOn', note: 60, time: 9.9 }] }];
+      looper.normalizeEventTimes();
+      expect(looper.layers[0].events[0].time).toBe(9.9);
+    });
   });
 });

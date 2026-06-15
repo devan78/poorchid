@@ -25,22 +25,23 @@
 -   **P**: G#
 -   **'**: A
 -   **[**: A#
+-   **]**: B
 
 ### Left Hand (Modifiers)
 
 -   **Extensions**:
-    -   **Q**: 6
-    -   **W**: 7
-    -   **E**: Maj7
-    -   **R**: 9
+    -   **\\**: 6
+    -   **Z**: 7
+    -   **X**: Maj7
+    -   **C**: 9
 -   **Chord Types**:
-    -   **A**: Major
+    -   **D**: Major
     -   **S**: Minor
-    -   **D**: Suspended
-    -   **F**: Diminished
+    -   **F**: Suspended
+    -   **A**: Diminished
 -   **Voicing**:
-    -   **Z**: Voicing Down
-    -   **X**: Voicing Up
+    -   **↑**: Voicing Up
+    -   **↓**: Voicing Down
 
 ### Other
 

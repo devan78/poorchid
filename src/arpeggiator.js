@@ -1,3 +1,5 @@
+import { LookaheadClock, dispatchAt } from './transport.js';
+
 /**
  * Arpeggiator - Handles arpeggiated playback of chords
  * Supports multiple patterns, note divisions, and sync to BPM
@@ -24,12 +26,10 @@ export class Arpeggiator {
     this.direction = 1; // 1 = up, -1 = down (for updown pattern)
     this.lastPlayedNote = null;
     
-    // Scheduling
-    this.nextNoteTime = 0;
-    this.schedulerInterval = null;
-    this.lookahead = 25; // ms to look ahead for scheduling
-    this.scheduleAheadTime = 0.1; // seconds to schedule ahead
-    
+    // Scheduling (shared lookahead clock + wall-clock dispatch timers)
+    this.clock = new LookaheadClock(audioContext);
+    this._dispatchTimers = [];
+
     // Note divisions in beats
     this.divisions = {
       '1/1': 4,
@@ -196,43 +196,29 @@ export class Arpeggiator {
   }
   
   /**
-   * Schedule the next note
+   * Schedule one step. Called by the lookahead clock with the step's audio time.
+   * The next note is chosen synchronously (so pattern order is deterministic),
+   * but the actual trigger is dispatched at `time` so steps stay evenly spaced
+   * instead of bunching together within a single lookahead window.
+   * Returns the duration until the next step.
    */
   scheduleNote(time) {
-    // Stop the previous note
-    if (this.lastPlayedNote !== null) {
-      this.onNoteOff(this.lastPlayedNote);
-    }
-    
+    const stepDuration = this.getStepDuration();
     const note = this.getNextNote();
     if (note !== null) {
-      // Calculate note duration (slightly less than step to avoid overlap)
-      const stepDuration = this.getStepDuration();
-      const noteDuration = stepDuration * 0.9;
-      
-      this.onNoteOn(note, 100, time);
-      this.lastPlayedNote = note;
-      
-      // Schedule note off
-      setTimeout(() => {
-        if (this.lastPlayedNote === note) {
-          this.onNoteOff(note);
-          this.lastPlayedNote = null;
-        }
-      }, noteDuration * 1000);
+      const timer = dispatchAt(this.ctx, time, () => {
+        if (!this.isRunning) return;
+        // Monophonic voice: releasing the previous note is handled by the
+        // audio engine's legato, but keep the callback for completeness.
+        if (this.lastPlayedNote !== null) this.onNoteOff(this.lastPlayedNote);
+        this.onNoteOn(note, 100);
+        this.lastPlayedNote = note;
+      });
+      this._dispatchTimers.push(timer);
     }
+    return stepDuration;
   }
-  
-  /**
-   * Main scheduler loop
-   */
-  scheduler() {
-    while (this.nextNoteTime < this.ctx.currentTime + this.scheduleAheadTime) {
-      this.scheduleNote(this.nextNoteTime);
-      this.nextNoteTime += this.getStepDuration();
-    }
-  }
-  
+
   /**
    * Start the arpeggiator
    */
@@ -240,31 +226,27 @@ export class Arpeggiator {
     if (notes.length > 0) {
       this.setNotes(notes);
     }
-    
+
     if (this.currentNotes.length === 0) return;
-    
+
     this.isRunning = true;
     this.currentIndex = 0;
     this.direction = this.pattern === 'down' || this.pattern === 'downup' ? -1 : 1;
-    this.nextNoteTime = startTime || this.ctx.currentTime;
-    
-    // Start scheduler
-    if (!this.schedulerInterval) {
-      this.schedulerInterval = setInterval(() => this.scheduler(), this.lookahead);
-    }
+
+    this.clock.start(startTime, (time) => this.scheduleNote(time));
   }
-  
+
   /**
    * Stop the arpeggiator
    */
   stop() {
     this.isRunning = false;
-    
-    if (this.schedulerInterval) {
-      clearInterval(this.schedulerInterval);
-      this.schedulerInterval = null;
-    }
-    
+    this.clock.stop();
+
+    // Cancel any pending dispatches
+    this._dispatchTimers.forEach(id => clearTimeout(id));
+    this._dispatchTimers = [];
+
     // Stop any playing note
     if (this.lastPlayedNote !== null) {
       this.onNoteOff(this.lastPlayedNote);
@@ -353,11 +335,9 @@ export class PatternPlayer {
     this.noteIndex = 0; // Which chord note to play next
     this.lastPlayedNote = null;
     
-    // Scheduling
-    this.nextStepTime = 0;
-    this.schedulerInterval = null;
-    this.lookahead = 25; // ms
-    this.scheduleAheadTime = 0.1; // seconds
+    // Scheduling (shared lookahead clock + wall-clock dispatch timers)
+    this.clock = new LookaheadClock(audioContext);
+    this._dispatchTimers = [];
   }
   
   /**
@@ -440,51 +420,35 @@ export class PatternPlayer {
   }
   
   /**
-   * Schedule the next step
+   * Schedule one step. The rest/hit decision and chord-note selection happen
+   * synchronously (deterministic order); the trigger is dispatched at `time`.
+   * Returns the duration until the next step.
    */
   scheduleStep(time) {
     const pattern = this.pattern;
     const shouldPlay = pattern[this.stepIndex] === 1;
-    
-    // Stop previous note
-    if (this.lastPlayedNote !== null) {
-      this.onNoteOff(this.lastPlayedNote);
-      this.lastPlayedNote = null;
-    }
-    
+    const stepDuration = this.getStepDuration();
+
     if (shouldPlay && this.currentNotes.length > 0) {
       const note = this.getNextChordNote();
       if (note !== null) {
         // Slight velocity variation for humanization
         const velocity = 90 + Math.floor(Math.random() * 20);
-        this.onNoteOn(note, velocity, time);
-        this.lastPlayedNote = note;
-        
-        // Schedule note off before next step
-        const stepDuration = this.getStepDuration();
-        setTimeout(() => {
-          if (this.lastPlayedNote === note) {
-            this.onNoteOff(note);
-            this.lastPlayedNote = null;
-          }
-        }, stepDuration * 0.8 * 1000);
+        const timer = dispatchAt(this.ctx, time, () => {
+          if (!this.isRunning) return;
+          if (this.lastPlayedNote !== null) this.onNoteOff(this.lastPlayedNote);
+          this.onNoteOn(note, velocity);
+          this.lastPlayedNote = note;
+        });
+        this._dispatchTimers.push(timer);
       }
     }
-    
+
     // Advance step
     this.stepIndex = (this.stepIndex + 1) % pattern.length;
+    return stepDuration;
   }
-  
-  /**
-   * Main scheduler loop
-   */
-  scheduler() {
-    while (this.nextStepTime < this.ctx.currentTime + this.scheduleAheadTime) {
-      this.scheduleStep(this.nextStepTime);
-      this.nextStepTime += this.getStepDuration();
-    }
-  }
-  
+
   /**
    * Start the pattern player
    */
@@ -492,30 +456,26 @@ export class PatternPlayer {
     if (notes.length > 0) {
       this.setNotes(notes);
     }
-    
+
     if (this.currentNotes.length === 0) return;
-    
+
     this.isRunning = true;
     this.stepIndex = 0;
     this.noteIndex = 0;
-    this.nextStepTime = startTime || this.ctx.currentTime;
-    
-    if (!this.schedulerInterval) {
-      this.schedulerInterval = setInterval(() => this.scheduler(), this.lookahead);
-    }
+
+    this.clock.start(startTime, (time) => this.scheduleStep(time));
   }
-  
+
   /**
    * Stop the pattern player
    */
   stop() {
     this.isRunning = false;
-    
-    if (this.schedulerInterval) {
-      clearInterval(this.schedulerInterval);
-      this.schedulerInterval = null;
-    }
-    
+    this.clock.stop();
+
+    this._dispatchTimers.forEach(id => clearTimeout(id));
+    this._dispatchTimers = [];
+
     if (this.lastPlayedNote !== null) {
       this.onNoteOff(this.lastPlayedNote);
       this.lastPlayedNote = null;

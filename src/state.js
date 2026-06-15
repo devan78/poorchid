@@ -453,7 +453,7 @@ export class PoorchidState {
     const clamped = Math.max(0, Math.min(99, level));
     if (this.state.fxLevels[effect] !== clamped) {
       this.state.fxLevels[effect] = clamped;
-      this.notify(['fxLevels', effect]);
+      this.notify(['fxLevels']);
     }
   }
 

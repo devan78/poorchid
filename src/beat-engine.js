@@ -1,14 +1,13 @@
+import { LookaheadClock } from './transport.js';
+
 export class BeatEngine {
   constructor(audioContext) {
     this.context = audioContext;
     this.bpm = 120;
     this.isPlaying = false;
     this.currentBeat = 0;
-    this.nextNoteTime = 0;
-    this.timerID = null;
-    this.lookahead = 25.0; // ms
-    this.scheduleAheadTime = 0.1; // s
-    
+    this.clock = new LookaheadClock(audioContext);
+
     this.patternName = 'rock';
     this.patterns = {
       'rock': {
@@ -56,32 +55,18 @@ export class BeatEngine {
     if (this.isPlaying) return;
     this.isPlaying = true;
     this.currentBeat = 0;
-    this.nextNoteTime = this.context.currentTime + 0.05;
-    this.scheduler();
+    // Drums are real Web Audio nodes, so they're scheduled directly at the
+    // step's audio time (sample-accurate, robust to setTimeout jitter).
+    this.clock.start(this.context.currentTime + 0.05, (time) => {
+      this.scheduleNote(this.currentBeat, time);
+      this.currentBeat = (this.currentBeat + 1) % 16;
+      return 0.25 * (60.0 / this.bpm); // 16th notes
+    });
   }
 
   stop() {
     this.isPlaying = false;
-    if (this.timerID) {
-      clearTimeout(this.timerID);
-      this.timerID = null;
-    }
-  }
-
-  scheduler() {
-    while (this.nextNoteTime < this.context.currentTime + this.scheduleAheadTime) {
-      this.scheduleNote(this.currentBeat, this.nextNoteTime);
-      this.nextNote();
-    }
-    if (this.isPlaying) {
-      this.timerID = setTimeout(() => this.scheduler(), this.lookahead);
-    }
-  }
-
-  nextNote() {
-    const secondsPerBeat = 60.0 / this.bpm;
-    this.nextNoteTime += 0.25 * secondsPerBeat; // 16th notes
-    this.currentBeat = (this.currentBeat + 1) % 16;
+    this.clock.stop();
   }
 
   scheduleNote(beatNumber, time) {
@@ -193,13 +178,13 @@ export class BeatEngine {
   }
 
   getNextNoteTime() {
-    return this.isPlaying ? this.nextNoteTime : this.context.currentTime;
+    return this.isPlaying ? this.clock.nextTime : this.context.currentTime;
   }
 
   getNextBarTime() {
     if (!this.isPlaying) return this.context.currentTime;
     const stepsToNextBar = (16 - this.currentBeat) % 16;
     const secondsPerStep = (60.0 / this.bpm) * 0.25;
-    return this.nextNoteTime + (stepsToNextBar * secondsPerStep);
+    return this.clock.nextTime + (stepsToNextBar * secondsPerStep);
   }
 }

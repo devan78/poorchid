@@ -280,11 +280,13 @@ export class AudioEngine {
     voice.gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
     
     voice.osc.stop(now + 0.2);
-    
-    // Cleanup
+
+    // Cleanup (guarded: nodes may already be torn down)
     setTimeout(() => {
-      voice.osc.disconnect();
-      voice.gain.disconnect();
+      try {
+        voice.osc.disconnect();
+        voice.gain.disconnect();
+      } catch (e) {}
     }, 250); // Slightly longer than release
 
     const voices = this.activeOscillators.get(voice.note);
@@ -350,9 +352,11 @@ export class AudioEngine {
     voice.osc.stop(now + 0.1);
 
     setTimeout(() => {
-      voice.osc.disconnect();
-      voice.gain.disconnect();
-      voice.filter.disconnect();
+      try {
+        voice.osc.disconnect();
+        voice.gain.disconnect();
+        voice.filter.disconnect();
+      } catch (e) {}
     }, 150);
 
     this.bassVoice = null;
