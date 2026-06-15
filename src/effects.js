@@ -16,32 +16,33 @@ export class Reverb {
     this.wetGain = ctx.createGain();
     this.dryGain = ctx.createGain();
     
-    // Simple algorithmic reverb using parallel delays with feedback
+    // Algorithmic reverb: parallel damped comb lines for a long, soft wash.
     this.preDelay = ctx.createDelay(0.1);
-    this.preDelay.delayTime.value = 0.02;
-    
-    // Create 4 parallel delay lines with prime-number-ish delays
+    this.preDelay.delayTime.value = 0.025;
+
+    // 6 parallel delay lines with prime-ish, longer times for a lusher tail
     this.delays = [];
     this.feedbacks = [];
-    const delayTimes = [0.037, 0.041, 0.053, 0.067];
-    
-    for (let i = 0; i < 4; i++) {
-      const delay = ctx.createDelay(0.1);
+    const delayTimes = [0.0431, 0.0573, 0.0727, 0.0893, 0.1097, 0.1303];
+
+    for (let i = 0; i < delayTimes.length; i++) {
+      const delay = ctx.createDelay(0.5);
       delay.delayTime.value = delayTimes[i];
-      
+
       const feedback = ctx.createGain();
       feedback.gain.value = 0.7;
-      
+
+      // Darker damping than before — smooth, washed shoegaze tail.
       const filter = ctx.createBiquadFilter();
       filter.type = 'lowpass';
-      filter.frequency.value = 4000 - (i * 500);
-      
+      filter.frequency.value = 3200 - (i * 240);
+
       this.preDelay.connect(delay);
       delay.connect(filter);
       filter.connect(feedback);
       feedback.connect(delay);
       filter.connect(this.wetGain);
-      
+
       this.delays.push(delay);
       this.feedbacks.push(feedback);
     }
@@ -57,10 +58,10 @@ export class Reverb {
   
   setLevel(level) {
     const mix = level / 99;
-    this.wetGain.gain.value = mix * 0.7;
-    this.dryGain.gain.value = 1 - (mix * 0.4);
-    // Soften feedback as mix goes down to avoid mud
-    const fb = 0.25 + mix * 0.4;
+    this.wetGain.gain.value = mix * 0.85;
+    this.dryGain.gain.value = 1 - (mix * 0.35);
+    // Longer, lusher tail at higher mix (parallel combs stay stable < 1.0).
+    const fb = 0.4 + mix * 0.45;
     this.feedbacks.forEach(fbNode => {
       fbNode.gain.value = fb;
     });

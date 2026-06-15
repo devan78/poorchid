@@ -3,9 +3,11 @@ import { PATCHES, DEFAULT_PATCH } from './patch-manager';
 import { FXChain } from './effects.js';
 
 export class AudioEngine {
-  constructor() {
+  // `ctx` may be injected (e.g. an OfflineAudioContext for offline rendering);
+  // otherwise a realtime AudioContext is created.
+  constructor(ctx = null) {
     try {
-      this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+      this.ctx = ctx || new (window.AudioContext || window.webkitAudioContext)();
     } catch (e) {
       console.error('Web Audio API not supported:', e);
       this.ctx = null;
@@ -21,40 +23,63 @@ export class AudioEngine {
     this.masterGain = this.ctx.createGain();
     this.masterGain.gain.value = 0.5;
 
-    // Secret flavour chain (glue + tone)
+    // Secret "flavour" chain — the cohesive tape / lo-fi / sun-faded character.
+    // Always-on glue so every patch and effect sits in the same hazy world.
     this.flavourEnabled = true;
     this.flavourInput = this.ctx.createGain();
     this.flavourOutput = this.ctx.createGain();
     this.flavourBypassGain = this.ctx.createGain();
     this.flavourBypassGain.gain.value = 0;
 
+    // Rumble cleanup
     this.flavourHighpass = this.ctx.createBiquadFilter();
     this.flavourHighpass.type = 'highpass';
-    this.flavourHighpass.frequency.value = 24;
-    this.flavourHighpass.Q.value = 0.55;
+    this.flavourHighpass.frequency.value = 30;
+    this.flavourHighpass.Q.value = 0.5;
 
+    // Low-end warmth
     this.flavourLowShelf = this.ctx.createBiquadFilter();
     this.flavourLowShelf.type = 'lowshelf';
-    this.flavourLowShelf.frequency.value = 90;
-    this.flavourLowShelf.gain.value = 0.35;
+    this.flavourLowShelf.frequency.value = 150;
+    this.flavourLowShelf.gain.value = 1.6;
 
-    this.flavourHighShelf = this.ctx.createBiquadFilter();
-    this.flavourHighShelf.type = 'highshelf';
-    this.flavourHighShelf.frequency.value = 11000;
-    this.flavourHighShelf.gain.value = 0.4;
+    // Tape wow & flutter — a gentle pitch wobble smeared across the whole mix.
+    this.flavourWow = this.ctx.createDelay(0.05);
+    this.flavourWow.delayTime.value = 0.006;
+    this.wowLFO = this.ctx.createOscillator();
+    this.wowLFO.type = 'sine';
+    this.wowLFO.frequency.value = 0.55;        // slow "wow"
+    this.wowDepth = this.ctx.createGain();
+    this.wowDepth.gain.value = 0.0015;
+    this.flutterLFO = this.ctx.createOscillator();
+    this.flutterLFO.type = 'sine';
+    this.flutterLFO.frequency.value = 6.3;      // faster "flutter"
+    this.flutterDepth = this.ctx.createGain();
+    this.flutterDepth.gain.value = 0.00012;
+    this.wowLFO.connect(this.wowDepth);
+    this.flutterLFO.connect(this.flutterDepth);
+    this.wowDepth.connect(this.flavourWow.delayTime);
+    this.flutterDepth.connect(this.flavourWow.delayTime);
+    this.wowLFO.start();
+    this.flutterLFO.start();
 
+    // Gentle parallel tape saturation (warmth/glue)
+    this.flavourSaturation = this.ctx.createWaveShaper();
+    this.flavourSaturation.curve = this.createSaturationCurve(0.16);
+    this.flavourSaturation.oversample = '4x';
     this.flavourDryGain = this.ctx.createGain();
-    this.flavourDryGain.gain.value = 0.9;
-
+    this.flavourDryGain.gain.value = 0.76;
     this.flavourWetGain = this.ctx.createGain();
-    this.flavourWetGain.gain.value = 0.1;
-
+    this.flavourWetGain.gain.value = 0.24;
     this.flavourMix = this.ctx.createGain();
 
-    this.flavourSaturation = this.ctx.createWaveShaper();
-    this.flavourSaturation.curve = this.createSaturationCurve(0.08);
-    this.flavourSaturation.oversample = '4x';
+    // Sun-faded top end — roll off the highs like an old Polaroid.
+    this.flavourTone = this.ctx.createBiquadFilter();
+    this.flavourTone.type = 'lowpass';
+    this.flavourTone.frequency.value = 9200;
+    this.flavourTone.Q.value = 0.6;
 
+    // Soft limiter to catch peaks introduced by the saturation
     this.flavourLimiter = this.ctx.createDynamicsCompressor();
     this.flavourLimiter.threshold.value = -0.5;
     this.flavourLimiter.ratio.value = 1.8;
@@ -76,7 +101,7 @@ export class AudioEngine {
     // Master Filter (warm, can be modulated)
     this.masterFilter = this.ctx.createBiquadFilter();
     this.masterFilter.type = 'lowpass';
-    this.masterFilter.frequency.value = 3000;
+    this.masterFilter.frequency.value = 4500;
     this.masterFilter.Q.value = 0.7;
     
     // FX Chain (controllable effects)
@@ -96,24 +121,29 @@ export class AudioEngine {
 
     this.flavourInput.connect(this.flavourHighpass);
     this.flavourHighpass.connect(this.flavourLowShelf);
-    this.flavourLowShelf.connect(this.flavourHighShelf);
-    this.flavourHighShelf.connect(this.flavourSaturation);
-    this.flavourHighShelf.connect(this.flavourDryGain);
+    this.flavourLowShelf.connect(this.flavourWow);
 
+    // Parallel saturation around the wow'd signal
+    this.flavourWow.connect(this.flavourSaturation);
+    this.flavourWow.connect(this.flavourDryGain);
     this.flavourSaturation.connect(this.flavourWetGain);
     this.flavourWetGain.connect(this.flavourMix);
     this.flavourDryGain.connect(this.flavourMix);
 
-    this.flavourMix.connect(this.flavourLimiter);
+    this.flavourMix.connect(this.flavourTone);
+    this.flavourTone.connect(this.flavourLimiter);
     this.flavourLimiter.connect(this.flavourTrim);
     this.flavourTrim.connect(this.flavourOutput);
 
     this.flavourOutput.connect(this.masterGain);
     this.flavourBypassGain.connect(this.masterGain);
     this.masterGain.connect(this.ctx.destination);
-    // Recorder tap point (post-master)
-    this.recordDestination = this.ctx.createMediaStreamDestination();
-    this.masterGain.connect(this.recordDestination);
+    // Recorder tap point (post-master). OfflineAudioContext has no
+    // createMediaStreamDestination, so guard it for offline rendering.
+    this.recordDestination = this.ctx.createMediaStreamDestination
+      ? this.ctx.createMediaStreamDestination()
+      : null;
+    if (this.recordDestination) this.masterGain.connect(this.recordDestination);
     this.mediaRecorder = null;
     this.recordedChunks = [];
     this.isRecording = false;
@@ -173,7 +203,7 @@ export class AudioEngine {
   }
 
   resume() {
-    if (this.ctx.state === 'suspended') {
+    if (this.ctx.state === 'suspended' && this.ctx.resume) {
       this.ctx.resume();
     }
   }
