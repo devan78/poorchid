@@ -8,7 +8,7 @@ export class PoorchidState {
       type: 'major',
       extensions: new Set(),
       voicingCenter: 60, // Middle C
-      filterCutoff: 2500, // Default warm cutoff
+      filterCutoff: 4500, // Default warm-but-present cutoff (flavour chain fades the very top)
       midiConnected: false,
       activeMidiNotes: new Set(),
       looperState: 'idle', // idle, recording, playing, overdubbing
@@ -42,14 +42,14 @@ export class PoorchidState {
       // Beat Engine
       beatEnabled: false, // Is the beat engine active?
       beatPattern: 'rock', // Current beat pattern
-      // FX System
-      currentEffect: 'direct', // Currently selected effect for editing (includes 'direct' for bypass)
+      // FX System — curated lush default so it sounds like the vibe out of the box.
+      currentEffect: 'reverb', // not 'direct', so the FX chain is active by default
       fxLocked: false, // Lock FX settings when changing sounds
       // Effect levels (0-99 each)
       fxLevels: {
-        reverb: 0,
+        reverb: 34,
         delay: 0,
-        chorus: 0,
+        chorus: 22,
         phaser: 0,
         flanger: 0,
         drive: 0,
