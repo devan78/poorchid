@@ -92,34 +92,39 @@ header p {
   margin-left: 0.4rem;
 }
 
-/* Subtle interaction hint line under the instrument */
+/* Interaction hint line under the instrument */
 .hint-bar {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 5px 24px;
-  margin: 16px 0 0;
-  padding: 0 12px;
-  font-size: 0.62rem;
-  letter-spacing: 0.03em;
-  color: #6c6c6c;
+  align-items: center;
+  gap: 6px 18px;
+  margin: 18px auto 0;
+  padding: 9px 18px;
+  max-width: 760px;
+  font-size: 0.7rem;
+  letter-spacing: 0.02em;
+  color: #9a9488;
   text-align: center;
+  background: rgba(255,255,255,0.025);
+  border: 1px solid rgba(255,255,255,0.05);
+  border-radius: 8px;
 }
 
 .hint-bar b {
-  color: #8c8c8c;
-  font-weight: 600;
+  color: var(--accent-yellow);
+  font-weight: 700;
 }
 
 .hint-bar kbd {
   font-family: ui-monospace, 'SF Mono', monospace;
-  font-size: 0.6rem;
-  background: #262626;
-  border: 1px solid #3a3a3a;
+  font-size: 0.66rem;
+  background: #2a2a2a;
+  border: 1px solid #444;
   border-bottom-width: 2px;
   border-radius: 3px;
-  padding: 0 4px;
-  color: #b8b8b8;
+  padding: 0 5px;
+  color: #d8d2c4;
 }
 
 /* Main Synth Chassis */
@@ -488,70 +493,59 @@ header p {
   height: 44px;
   border-radius: 50%;
   position: relative;
-  box-shadow: 
-    0 3px 6px rgba(0,0,0,0.4),
-    0 1px 3px rgba(0,0,0,0.3),
-    inset 0 1px 1px rgba(255,255,255,0.1);
-  transition: box-shadow 0.1s ease;
-  /* Subtle grip ridges via repeating conic gradient */
-  --knob-color: #3a3a3a;
-  --knob-highlight: #484848;
-  --knob-shadow: #2a2a2a;
-  background: 
-    /* Larger center cap (more subtle edge grip) */
-    radial-gradient(circle at 50% 50%, var(--knob-color) 65%, transparent 66%),
-    /* Subtle grip ridges - only visible at edge */
-    repeating-conic-gradient(
-      from 0deg,
-      var(--knob-highlight) 0deg 3deg,
-      var(--knob-shadow) 3deg 6deg,
-      var(--knob-color) 6deg 9deg
-    );
+  --collar: #343434; /* coloured skirt around the metal cap */
+  transition: box-shadow 0.1s ease, transform 0.1s ease;
+  /* Coloured collar with fine machined grip ridges */
+  background:
+    repeating-conic-gradient(from 0deg,
+      color-mix(in srgb, var(--collar) 78%, #fff) 0deg 4.5deg,
+      color-mix(in srgb, var(--collar) 62%, #000) 4.5deg 9deg);
+  box-shadow:
+    0 4px 9px rgba(0,0,0,0.45),
+    0 1px 2px rgba(0,0,0,0.4),
+    inset 0 0 0 1px rgba(0,0,0,0.4);
 }
 
+/* Brushed-aluminium cap */
 .encoder-knob::before {
   content: '';
   position: absolute;
-  top: 6px;
-  left: 6px;
-  right: 6px;
-  bottom: 6px;
+  inset: 7px;
   border-radius: 50%;
-  background: var(--knob-color);
-  box-shadow: 
-    inset 0 1px 3px rgba(255,255,255,0.12),
-    inset 0 -1px 3px rgba(0,0,0,0.3);
+  background:
+    linear-gradient(145deg,
+      #ececee 0%, #c2c5c9 26%, #9a9ea3 50%, #c7cacf 73%, #72767b 100%);
+  box-shadow:
+    inset 0 1px 1px rgba(255,255,255,0.75),
+    inset 0 -2px 3px rgba(0,0,0,0.4),
+    0 1px 2px rgba(0,0,0,0.35);
 }
 
-/* Top shine/reflection */
+/* Soft top reflection on the cap */
 .encoder-knob::after {
   content: '';
   position: absolute;
-  top: 2px;
-  left: 20%;
-  right: 20%;
-  height: 35%;
-  border-radius: 50% 50% 40% 40%;
-  background: linear-gradient(
-    180deg,
-    rgba(255,255,255,0.15) 0%,
-    rgba(255,255,255,0.03) 50%,
-    transparent 100%
-  );
+  top: 8px;
+  left: 27%;
+  right: 27%;
+  height: 28%;
+  border-radius: 50%;
+  background: linear-gradient(180deg,
+    rgba(255,255,255,0.6) 0%, rgba(255,255,255,0.06) 70%, transparent 100%);
   pointer-events: none;
 }
 
 .encoder-indicator {
   position: absolute;
-  top: 8px;
+  top: 5px;
   left: 50%;
   transform: translateX(-50%);
-  width: 2px;
-  height: 6px;
-  background: #fff;
-  border-radius: 1px;
-  box-shadow: 0 0 3px rgba(255,255,255,0.4);
-  z-index: 2;
+  width: 3px;
+  height: 12px;
+  background: #2b2b2b;
+  border-radius: 2px;
+  box-shadow: 0 1px 0 rgba(255,255,255,0.45);
+  z-index: 3;
 }
 
 .encoder:hover .encoder-knob {
@@ -587,106 +581,34 @@ header p {
   color: var(--text-label);
 }
 
-/* Encoder Colors */
-.encoder.yellow .encoder-knob {
-  --knob-color: #c9981d;
-  --knob-highlight: #d9a82d;
-  --knob-shadow: #a07810;
-}
+/* Encoder accent collars */
+.encoder.yellow   .encoder-knob { --collar: #c9981d; }
+.encoder.charcoal .encoder-knob { --collar: #343434; }
+.encoder.red      .encoder-knob { --collar: #a83232; }
+.encoder.green    .encoder-knob { --collar: #1a9178; }
 
-.encoder.yellow .encoder-indicator {
-  background: #1a1a1a;
-  box-shadow: none;
-}
+/* Active: brighter collar + an accent glow halo + a lit indicator.
+   --glow is set on the .encoder and inherited by the knob/indicator. */
+.encoder.yellow.active   { --glow: rgba(230,168,23,0.65); }
+.encoder.charcoal.active { --glow: rgba(0,180,220,0.6); }
+.encoder.red.active      { --glow: rgba(208,48,48,0.6); }
+.encoder.green.active    { --glow: rgba(32,176,144,0.6); }
 
-/* Perform encoder active state (when not in direct mode) */
-.encoder.yellow.active .encoder-knob {
-  --knob-color: #e0b020;
-  --knob-highlight: #f0c030;
-  --knob-shadow: #b08010;
+.encoder.yellow.active   .encoder-knob { --collar: #e6a817; }
+.encoder.charcoal.active .encoder-knob { --collar: #00aacc; }
+.encoder.red.active      .encoder-knob { --collar: #d83838; }
+.encoder.green.active    .encoder-knob { --collar: #22b394; }
+
+.encoder.active .encoder-knob {
   box-shadow:
-    0 0 12px rgba(255, 235, 59, 0.5),
-    inset 0 3px 6px var(--knob-highlight),
-    inset 0 -3px 6px var(--knob-shadow);
+    0 4px 9px rgba(0,0,0,0.45),
+    0 0 15px var(--glow, rgba(255,255,255,0.4)),
+    inset 0 0 0 1px rgba(0,0,0,0.35);
 }
 
-.encoder.yellow.active .encoder-indicator {
-  background: #ffeb3b;
-  box-shadow: 0 0 10px rgba(255, 235, 59, 0.9);
-}
-
-.encoder.charcoal .encoder-knob {
-  --knob-color: #3a3a3a;
-  --knob-highlight: #5a5a5a;
-  --knob-shadow: #1a1a1a;
-}
-
-/* Key encoder active state (when key lock is enabled) */
-.encoder.charcoal.active .encoder-knob {
-  --knob-color: #0088aa;
-  --knob-highlight: #00b4dc;
-  --knob-shadow: #005577;
-  box-shadow:
-    0 0 12px rgba(0, 180, 220, 0.5),
-    inset 0 3px 6px var(--knob-highlight),
-    inset 0 -3px 6px var(--knob-shadow);
-}
-
-.encoder.charcoal.active .encoder-indicator {
-  background: #00e5ff;
-  box-shadow: 0 0 10px rgba(0, 229, 255, 0.9);
-}
-
-.encoder.red .encoder-knob {
-  --knob-color: #b02525;
-  --knob-highlight: #c43030;
-  --knob-shadow: #801818;
-}
-
-.encoder.red .encoder-indicator {
+.encoder.active .encoder-indicator {
   background: #fff;
-  box-shadow: 0 0 6px rgba(255,255,255,0.8);
-}
-
-/* Bass encoder active state (when bass is enabled) */
-.encoder.red.active .encoder-knob {
-  --knob-color: #d03030;
-  --knob-highlight: #e84040;
-  box-shadow:
-    0 0 12px rgba(208, 48, 48, 0.5),
-    inset 0 3px 6px var(--knob-highlight),
-    inset 0 -3px 6px var(--knob-shadow);
-}
-
-.encoder.red.active .encoder-indicator {
-  background: #ff4444;
-  box-shadow: 0 0 10px rgba(255,68,68,0.9);
-}
-
-/* Green Encoder (Looper Play) */
-.encoder.green .encoder-knob {
-  --knob-color: #1a9178;
-  --knob-highlight: #2abfa0;
-  --knob-shadow: #126654;
-}
-
-.encoder.green .encoder-indicator {
-  background: #fff;
-  box-shadow: 0 0 6px rgba(255,255,255,0.8);
-}
-
-.encoder.green.active .encoder-knob {
-  --knob-color: #20b090;
-  --knob-highlight: #30d0b0;
-  box-shadow:
-    0 0 12px rgba(32, 176, 144, 0.5),
-    inset 0 3px 6px var(--knob-highlight),
-    inset 0 -3px 6px var(--knob-shadow);
-}
-
-.encoder.green.active .encoder-indicator {
-  background: #40ffcc;
-  box-shadow: 0 0 10px rgba(64, 255, 204, 0.9);
+  box-shadow: 0 0 9px var(--glow, rgba(255,255,255,0.6));
 }
 
 /* Bass mode label under encoder */
